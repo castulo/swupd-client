@@ -882,6 +882,9 @@ create_version() {
 	sudo mkdir -p "$env_name"/web-dir/"$version"/{files,delta,staged}
 	sudo mkdir -p "$env_name"/web-dir/version/format"$format"
 	write_to_protected_file "$env_name"/web-dir/version/format"$format"/latest "$version"
+	if [ "$format" = staging ]; then
+		format=1
+	fi
 	write_to_protected_file "$env_name"/web-dir/"$version"/format "$format"
 	# create a new os-release file per version
 	{
@@ -916,15 +919,30 @@ create_version() {
 		sudo cp "$env_name"/web-dir/"$from_version"/Manifest.MoM "$env_name"/web-dir/"$version"
 		mom="$env_name"/web-dir/"$version"/Manifest.MoM
 		# update MoM info and create the tars
-		if [ "$format" = staging ]; then
-			format=1
-		fi
 		sudo sed -i "s/MANIFEST	.*/MANIFEST\\t$format/" "$mom"
 		sudo sed -i "s/version:.*/version:\\t$version/" "$mom"
 		sudo sed -i "s/previous:.*/previous:\\t$from_version/" "$mom"
 		sudo sed -i "s/timestamp:.*/timestamp:\\t$(date +"%s")/" "$mom"
 		create_tar "$mom"
 		sign_manifest "$mom"
+		# when creating a new version we need to make an update to os-release and format
+		# files in the os-core bundle (unless it does not exist)
+		oldversion="$version"
+		while [ "$oldversion" -gt 0 ] && [ ! -e "$env_name"/web-dir/"$oldversion"/Manifest.os-core ]; do
+			oldversion=$(awk '/previous/ { print $2 }' "$env_name"/web-dir/"$oldversion"/Manifest.MoM)
+		done
+		# if no os-core manifest was found, nothing else needs to be done
+		if [ -e "$env_name"/web-dir/"$oldversion"/Manifest.os-core ]; then
+			update_bundle "$env_name" os-core --header-only
+			if [ ! -z $(get_hash_from_manifest "$env_name"/web-dir/"$oldversion"/Manifest.os-core /usr/lib/os-release) ]; then
+				remove_from_manifest "$env_name"/web-dir/"$version"/Manifest.os-core /usr/lib/os-release
+			fi
+			update_bundle "$env_name" os-core --add /usr/lib/os-release:"$OS_RELEASE"
+			if [ ! -z $(get_hash_from_manifest "$env_name"/web-dir/"$oldversion"/Manifest.os-core /usr/share/defaults/swupd/format) ]; then
+				remove_from_manifest "$env_name"/web-dir/"$version"/Manifest.os-core /usr/share/defaults/swupd/format
+			fi
+			update_bundle "$env_name" os-core --add /usr/share/defaults/swupd/format:"$FORMAT"
+		fi
 	fi
 
 }
@@ -932,13 +950,17 @@ create_version() {
 # Creates a test environment with the basic directory structure needed to
 # validate the swupd client
 # Parameters:
-# - -E: if this option is set the test environment is created empty (withouth bundle os-core)
+# - -e: if this option is set the test environment is created empty (withouth bundle os-core)
+# - -u: if this option is set the test environment is created with a more complete version of
+#       the os-core bundle that is useful for some tests like update tests
 # - ENVIRONMENT_NAME: the name of the test environment, this should be typically the test name
 # - VERSION: the version to use for the test environment, if not specified the default is 10
 create_test_environment() { 
 
 	local empty=false
+	local minimal_os_core=true
 	[ "$1" = "-e" ] && { empty=true ; shift ; }
+	[ "$1" = "-u" ] && { minimal_os_core=false ; shift ; }
 	local env_name=$1 
 	local version=${2:-10}
 
@@ -951,6 +973,9 @@ create_test_environment() {
 			Options:
 			    -e    If set, the test environment is created empty, otherwise it will have
 			          bundle os-core in the web-dir and installed by default.
+			    -u    If set, the test environment is created with a more complete version of
+			          the os-core bundle, a version that includes the os-release and format
+			          files, so it is more useful for some tests, like update tests.
 			EOM
 		)"
 		return
@@ -978,9 +1003,13 @@ create_test_environment() {
 	set_env_variables "$env_name"
 
 	# every environment needs to have at least the os-core bundle so this should be
-	# added by default to every test environment
+	# added by default to every test environment unless specified otherwise
 	if [ "$empty" = false ]; then
-		create_bundle -L -n os-core -v "$version" -f /usr/bin/core "$env_name"
+		if [ "$minimal_os_core" = true ]; then
+			create_bundle -L -n os-core -v "$version" -f /core "$env_name"
+		else
+			create_bundle -L -n os-core -v "$version" -f /core,/usr/lib/os-release:"$OS_RELEASE",/usr/share/defaults/swupd/format:"$FORMAT" "$env_name"
+		fi
 	fi
 
 }
@@ -1053,6 +1082,30 @@ create_bundle() {
 		)"
 	}
 
+	add_dirs_recursively() {
+
+		if [[ "$val" != "/"* ]]; then
+			val=/"$val"
+		fi
+		# if the directories the file is don't exist, add them to the bundle
+		# there are a few exceptions, the dir of the tracking file /usr/share/clear/bundles,
+		# and "\"
+		fdir=$(dirname "${val%:*}")
+		if [ ! "$(sudo cat "$manifest" | grep -x "D\\.\\.\\..*$fdir")" ] && [ "$fdir" != "/usr/share/clear/bundles" ] \
+		&& [ "$fdir" != "/" ]; then
+			bundle_dir=$(create_dir "$files_path")
+			add_to_manifest "$manifest" "$bundle_dir" "$fdir"
+			# add each one of the directories of the path if they are not in the manifest already
+			while [ "$(dirname "$fdir")" != "/" ]; do
+				fdir=$(dirname "$fdir")
+				if [ ! "$(sudo cat "$manifest" | grep -x "D\\.\\.\\..*$fdir")" ]; then
+					add_to_manifest "$manifest" "$bundle_dir" "$fdir"
+				fi
+			done
+		fi
+
+	}
+
 	local OPTIND
 	local opt
 	local dir_list
@@ -1092,11 +1145,6 @@ create_bundle() {
 	# set default values
 	bundle_name=${bundle_name:-$(generate_random_name test-bundle-)}
 	version=${version:-10}
-	if [ -z "$dir_list" ] && [ -z "$file_list" ] && [ -z "$link_list" ] && [ -z "$dangling_link_list" ] ; then
-		# if nothing was specified to be created, at least create
-		# one directory which is the bare minimum for a bundle
-		dir_list=(/usr/bin)
-	fi
 	# all bundles should include their own tracking file, so append it to the
 	# list of files to be created in the bundle
 	file_list+=(/usr/share/clear/bundles/"$bundle_name")
@@ -1127,10 +1175,7 @@ create_bundle() {
 	# Create a zero pack for the bundle and add the directory to it
 	add_to_pack "$bundle_name" "$bundle_dir"
 	for val in "${dir_list[@]}"; do
-		if [[ "$val" != "/"* ]]; then
-			val=/"$val"
-		fi
-		# the "/" directory is not allowed in the manifest
+		add_dirs_recursively
 		if [ "$val" != "/" ]; then
 			add_to_manifest "$manifest" "$bundle_dir" "$val"
 			if [ "$local_bundle" = true ]; then
@@ -1141,23 +1186,7 @@ create_bundle() {
 	
 	# 3) Create the requested file(s)
 	for val in "${file_list[@]}"; do
-		if [[ "$val" != "/"* ]]; then
-			val=/"$val"
-		fi
-		# if the directories the file is don't exist, add them to the bundle
-		# there are 2 exceptions, the dir of the tracking file and "\"
-		fdir=$(dirname "${val%:*}")
-		if [ ! "$(sudo cat "$manifest" | grep -x "D\\.\\.\\..*$fdir")" ] && [ "$fdir" != "/usr/share/clear/bundles" ] && [ "$fdir" != "/" ]; then
-			bundle_dir=$(create_dir "$files_path")
-			add_to_manifest "$manifest" "$bundle_dir" "$fdir"
-			# add each one of the directories of the path if they are not in the manifest already
-			while [ "$(dirname "$fdir")" != "/" ]; do
-				fdir=$(dirname "$fdir")
-				if [ ! "$(sudo cat "$manifest" | grep -x "D\\.\\.\\..*$fdir")" ]; then
-					add_to_manifest "$manifest" "$bundle_dir" "$fdir"
-				fi
-			done
-		fi
+		add_dirs_recursively
 		# if the user wants to use an existing file, use it, else create a new one
 		if [[ "$val" = *":"* ]]; then
 			bundle_file="${val#*:}"
@@ -1441,12 +1470,16 @@ update_bundle() {
 			    update_bundle <environment_name> <bundle_name> --ghost <file_name>
 			    update_bundle <environment_name> <bundle_name> --update <file_name>
 			    update_bundle <environment_name> <bundle_name> --rename[-legacy] <file_name> <new_name>
+			    update_bundle <environment_name> <bundle_name> --header-only
 			    
 			EOM
 		)"
 		return
 	fi
 
+	if [ "$option" = "--header-only" ]; then
+		fname="dummy"
+	fi
 	validate_path "$env_name"
 	validate_param "$bundle"
 	validate_param "$option"
@@ -1487,8 +1520,8 @@ update_bundle() {
 	fi
 	contentsize=$(awk '/contentsize/ { print $2 }' "$bundle_manifest")
 
-	# these actions apply to all operations except when adding a new file
-	if [ "$option" != "--add" ] && [ "$option" != "--add-dir" ] && [ "$option" != "--add-file" ]; then
+	# these actions apply to all operations except when adding a new file or updating the header only
+	if [ "$option" != "--add" ] && [ "$option" != "--add-dir" ] && [ "$option" != "--add-file" ] && [ "$option" != "--header-only" ]; then
 		fhash=$(get_hash_from_manifest "$bundle_manifest" "$fname")
 		fsize=$(stat -c "%s" "$oldversion_path"/files/"$fhash")
 		fname="${fname////\\/}"  # replacing every / with \/ in fname to escape them
@@ -1518,8 +1551,8 @@ update_bundle() {
 		if [[ "$fname" = *":"* ]]; then
 			new_file="${fname#*:}"
 			validate_item "$new_file"
-			sudo cp "$new_file" "$version_path"/files/"$(basename "$new_file")"
-			sudo cp "$new_file".tar "$version_path"/files/"$(basename "$new_file")".tar
+			sudo rsync -aq "$new_file" "$version_path"/files/"$(basename "$new_file")"
+			sudo rsync -aq "$new_file".tar "$version_path"/files/"$(basename "$new_file")".tar
 			new_file="$version_path"/files/"$(basename "$new_file")"
 			fname="${fname%:*}"
 		else
@@ -1629,6 +1662,9 @@ update_bundle() {
 		sudo bsdiff "$oldversion_path"/files/"$fhash" "$oldversion_path"/files/"$fhash" "$version_path"/delta/"$delta_name"
 		# create or add to the delta-pack
 		add_to_pack "$bundle" "$version_path"/delta/"$delta_name" "$oldversion"
+		;;
+	--header-only)
+		# do nothing
 		;;
 	*)
 		terminate "Please select a valid option for updating the bundle: --delete, --ghost, --rename, --update"
