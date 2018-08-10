@@ -159,6 +159,7 @@ set_env_variables() {
 	export SWUPD_OPTS="-S $path/$env_name/state -p $path/$env_name/target-dir -F staging -u file://$path/$env_name/web-dir -C $FUNC_DIR/Swupd_Root.pem -I"
 	export SWUPD_OPTS_NO_CERT="-S $path/$env_name/state -p $path/$env_name/target-dir -F staging -u file://$path/$env_name/web-dir"
 	export SWUPD_OPTS_MIRROR="-p $path/$env_name/target-dir"
+	export SWUPD_OPTS_NO_FMT="-S $path/$env_name/state -p $path/$env_name/target-dir -u file://$path/$env_name/web-dir -C $FUNC_DIR/Swupd_Root.pem -I"
 	export TEST_DIRNAME="$path"/"$env_name"
 	export WEBDIR="$env_name"/web-dir
 	export TARGETDIR="$env_name"/target-dir
@@ -429,7 +430,7 @@ add_to_manifest() {
 	elif [ -d "$item" ]; then
 		item_type=D
 	fi
-	# if the file is in the /usr/lib/kernel dir then it is a boot file
+	# if the file is in the /usr/lib/{kernel, modules} dir then it is a boot file
 	if [ "$(dirname "$item_path")" = "/usr/lib/kernel" ] || [ "$(dirname "$item_path")" = "/usr/lib/modules/" ]; then
 		boot_type="b"
 	fi
@@ -491,6 +492,7 @@ add_dependency_to_manifest() {
 	# If a manifest tar already exists for that manifest, renew the manifest tar
 	sudo rm -f "$manifest".tar
 	create_tar "$manifest"
+	update_hashes_in_mom "$path"/"$version"/Manifest.MoM
 
 }
 
@@ -543,7 +545,76 @@ remove_from_manifest() {
 	if [ "$(basename "$manifest")" = Manifest.MoM ]; then
 		sudo rm -f "$manifest".sig
 		sign_manifest "$manifest"
+	else
+		update_hashes_in_mom "$(dirname "$manifest")"/Manifest.MoM
 	fi
+
+}
+
+# Updates fields in an existing manifest
+# Parameters:
+# - MANIFEST: the relative path to the manifest file
+# - KEY: the thing to be updated
+# - HASH/NAME: the file name or hash of the record to be updated (if applicable)
+# - VALUE: the value to be used for updating the record 
+update_manifest() {
+
+	local manifest=$1
+	local key=$2
+	local var=$3
+	local value=$4
+
+	# If no parameters are received show usage
+	if [ $# -eq 0 ]; then
+		echo "$(cat <<-EOM
+			Usage:
+			    update_manifest <manifest> <format | version | previous | filecount | timestamp | contentsize> <new_value>
+			    update_manifest <manifest> <file-status | file-hash | file-version | file-name> <file_hash or file_name> <new_value>
+			    
+			EOM
+		)"
+		return
+	fi
+
+	validate_item "$manifest"
+	validate_param "$key"
+	validate_param "$var"
+
+	var="${var////\\/}"
+	value="${value////\\/}"
+
+	case "$key" in
+	format | version | previous | filecount | timestamp | contentsize)
+		sudo sed -i "s/$key.*/$key:\\t$var/" "$manifest"
+		;;
+	file-status)
+		validate_param "$value"
+		sudo sed -i "/\\t$var$/s/....\(\\t.*\\t.*\\t.*$\)/$value\1/g" "$manifest"
+		sudo sed -i "/\\t$var\\t/s/....\(\\t.*\\t.*\\t.*$\)/$value\1/g" "$manifest"
+		;;
+	file-hash)
+		validate_param "$value"
+		sudo sed -i "/\\t$var$/s/\(....\\t\).*\(\\t.*\\t\)/\1$value\2/g" "$manifest"
+		sudo sed -i "/\\t$var\\t/s/\(....\\t\).*\(\\t.*\\t\)/\1$value\2/g" "$manifest"
+		;;
+	file-version)
+		validate_param "$value"
+		sudo sed -i "/\\t$var$/s/\(....\\t.*\\t\).*\(\\t\)/\1$value\2/g" "$manifest"
+		sudo sed -i "/\\t$var\\t/s/\(....\\t.*\\t\).*\(\\t\)/\1$value\2/g" "$manifest"
+		;;
+	file-name)
+		validate_param "$value"
+		sudo sed -i "/\\t$var$/s/\(....\\t.*\\t.*\\t\).*/\1$value/g" "$manifest"
+		sudo sed -i "/\\t$var\\t/s/\(....\\t.*\\t.*\\t\).*/\1$value/g" "$manifest"
+		;;
+	*)
+		terminate "Please select a valid key for updating the manifest"
+		;;
+	esac
+	# update tars and MoM
+	sudo rm -f  "$manifest".tar
+	create_tar  "$manifest"
+	update_hashes_in_mom "$(dirname "$manifest")"/Manifest.MoM
 
 }
 
@@ -598,6 +669,77 @@ update_hashes_in_mom() {
 		return 1
 	fi
 	unset IFS
+
+}
+
+# Update all manifests after a format bump
+# Parameters:
+# ENVIRONMT_NAME: the name of the test environment
+bump_format() {
+
+	local env_name=$1
+	local format
+	local version
+	local previous_version
+	local mom
+	local manifest
+	local bundles
+	local version_path
+	
+	# If no parameters are received show usage
+	if [ $# -eq 0 ]; then
+		echo "$(cat <<-EOM
+			Usage:
+			    bump_format <environment_name>
+			    
+			EOM
+		)"
+		return
+	fi
+
+	validate_path "$env_name"
+
+	# find the latest MoM
+	version=("$(ls "$env_name"/web-dir | grep -E '^[0-9]+$' | sort -rn | head -n1)")
+	version_path="$env_name"/web-dir/"$version"
+	format="$(cat "$version_path"/format)"
+	mom="$version_path"/Manifest.MoM
+
+	# copy all manifests in MoM to current version
+	bundles=($(cat "$mom" | grep -x "M\.\.\..*" | awk '{ print $4 }'))
+	IFS=$'\n'
+	for bundle in ${bundles[*]}; do
+		# search for the latest manifest version for the bundle
+		manifest="$env_name"/web-dir/"$version"/Manifest."$bundle"
+		if [ ! -e "$manifest" ]; then
+			previous_version="$version"
+			while [ "$previous_version" -gt 0 ] && [ ! -e "$manifest" ]; do
+				previous_version="$(awk '/previous/ { print $2 }' "$mom")"
+				manifest="$env_name"/web-dir/"$previous_version"/Manifest."$bundle"
+			done
+			sudo cp "$manifest" "$env_name"/web-dir/"$version"/Manifest."$bundle"
+			manifest="$env_name"/web-dir/"$version"/Manifest."$bundle"
+			# copy the zero pack also from the old version to the new one
+			sudo cp "$env_name"/web-dir/"$previous_version"/pack-"$bundle"-from-0.tar "$env_name"/web-dir/"$version"/pack-"$bundle"-from-0.tar
+			# extract the content of the zero pack in the files directory so we have
+			# all files available to create future delta packs
+			sudo tar -xf "$env_name"/web-dir/"$version"/pack-"$bundle"-from-0.tar --strip-components 1 --directory "$env_name"/web-dir/"$version"/files
+			files=("$(ls "$env_name"/web-dir/"$version"/files)")
+			for bundle_file in ${files[*]}; do
+				create_tar "$env_name"/web-dir/"$version"/files/"$bundle_file"
+			done
+		fi
+		# update manifest headers
+		sudo sed -i "s/MANIFEST.*/MANIFEST\\t$format/" "$manifest"
+		sudo sed -i "s/version:.*/version:\\t$version/" "$manifest"
+		sudo sed -i "s/previous:.*/previous:\\t$previous_version/" "$manifest"
+		# update manifest content with latest version
+		sudo sed -i "/....\\t.*\\t.*\\t.*$/s/\(....\\t.*\\t\).*\(\\t\)/\1$version\2/g" "$manifest"
+		create_tar "$manifest"
+	done
+	unset IFS
+
+	update_hashes_in_mom "$mom"
 
 }
 
@@ -708,18 +850,21 @@ set_latest_version() {
 # - ENVIRONMENT_NAME: the name of the test environment
 # - VERSION: the version of the server side content
 # - FROM_VERSION: the previous version, if nothing is selected defaults to 0
+# - FORMAT: the format to use for the version
 create_version() {
 
 	local env_name=$1
 	local version=$2
 	local from_version=${3:-0}
+	local format=${4:-staging}
 	local mom
+	local hashed_name
 
 	# If no parameters are received show usage
 	if [ $# -eq 0 ]; then
 		echo "$(cat <<-EOM
 			Usage:
-			    create_version <environment_name> <new_version> [from_version]
+			    create_version <environment_name> <new_version> [from_version] [format]
 			    
 			EOM
 		)"
@@ -735,24 +880,52 @@ create_version() {
 	fi
 
 	sudo mkdir -p "$env_name"/web-dir/"$version"/{files,delta,staged}
+	sudo mkdir -p "$env_name"/web-dir/version/format"$format"
+	write_to_protected_file "$env_name"/web-dir/version/format"$format"/latest "$version"
+	write_to_protected_file "$env_name"/web-dir/"$version"/format "$format"
+	# create a new os-release file per version
+	{
+		printf 'NAME="Clear Linux Software for Intel Architecture"\n'
+		printf 'VERSION=1\n'
+		printf 'ID=clear-linux-os\n'
+		printf 'VERSION_ID=%s\n' "$version"
+		printf 'PRETTY_NAME="Clear Linux Software for Intel Architecture"\n'
+		printf 'ANSI_COLOR="1;35"\n'
+		printf 'HOME_URL="https://clearlinux.org"\n'
+		printf 'SUPPORT_URL="https://clearlinux.org"\n'
+		printf 'BUG_REPORT_URL="https://bugs.clearlinux.org/jira"\n'
+	} | sudo tee "$env_name"/web-dir/"$version"/os-release > /dev/null
+	# copy hashed versions of os-release and format to the files directory
+	hashed_name=$(sudo "$SWUPD" hashdump "$env_name"/web-dir/"$version"/os-release 2> /dev/null)
+	sudo cp "$env_name"/web-dir/"$version"/os-release "$env_name"/web-dir/"$version"/files/"$hashed_name"
+	create_tar "$env_name"/web-dir/"$version"/files/"$hashed_name"
+	OS_RELEASE="$env_name"/web-dir/"$version"/files/"$hashed_name"
+	export OS_RELEASE
+	hashed_name=$(sudo "$SWUPD" hashdump "$env_name"/web-dir/"$version"/format 2> /dev/null)
+	sudo cp "$env_name"/web-dir/"$version"/format "$env_name"/web-dir/"$version"/files/"$hashed_name"
+	create_tar "$env_name"/web-dir/"$version"/files/"$hashed_name"
+	FORMAT="$env_name"/web-dir/"$version"/files/"$hashed_name"
+	export FORMAT
 	# if the previous version is 0 then create a new MoM, otherwise copy the MoM
 	# from the previous version
 	if [ "$from_version" = 0 ]; then
-		sudo mkdir -p "$env_name"/web-dir/version/formatstaging
 		mom=$(create_manifest "$env_name"/web-dir/"$version" MoM)
 		create_tar "$mom"
 		sign_manifest "$mom"
 	else
 		sudo cp "$env_name"/web-dir/"$from_version"/Manifest.MoM "$env_name"/web-dir/"$version"
 		mom="$env_name"/web-dir/"$version"/Manifest.MoM
-		# update from and current versions and create the tars
+		# update MoM info and create the tars
+		if [ "$format" = staging ]; then
+			format=1
+		fi
+		sudo sed -i "s/MANIFEST	.*/MANIFEST\\t$format/" "$mom"
 		sudo sed -i "s/version:.*/version:\\t$version/" "$mom"
 		sudo sed -i "s/previous:.*/previous:\\t$from_version/" "$mom"
 		sudo sed -i "s/timestamp:.*/timestamp:\\t$(date +"%s")/" "$mom"
 		create_tar "$mom"
 		sign_manifest "$mom"
 	fi
-	write_to_protected_file "$env_name"/web-dir/version/formatstaging/latest "$version"
 
 }
 
@@ -791,17 +964,7 @@ create_test_environment() {
 
 	# target-dir files & dirs
 	sudo mkdir -p "$env_name"/target-dir/usr/lib
-	{
-		printf 'NAME="Clear Linux Software for Intel Architecture"\n'
-		printf 'VERSION=1\n'
-		printf 'ID=clear-linux-os\n'
-		printf 'VERSION_ID=%s\n' "$version"
-		printf 'PRETTY_NAME="Clear Linux Software for Intel Architecture"\n'
-		printf 'ANSI_COLOR="1;35"\n'
-		printf 'HOME_URL="https://clearlinux.org"\n'
-		printf 'SUPPORT_URL="https://clearlinux.org"\n'
-		printf 'BUG_REPORT_URL="https://bugs.clearlinux.org/jira"\n'
-	} | sudo tee "$env_name"/target-dir/usr/lib/os-release > /dev/null
+	sudo cp "$env_name"/web-dir/"$version"/os-release "$env_name"/target-dir/usr/lib/os-release
 	sudo mkdir -p "$env_name"/target-dir/usr/share/clear/bundles
 	sudo mkdir -p "$env_name"/target-dir/usr/share/defaults/swupd
 	printf '1' | sudo tee "$env_name"/target-dir/usr/share/defaults/swupd/format > /dev/null
@@ -949,6 +1112,8 @@ create_bundle() {
 	if [ "$DEBUG" == true ]; then
 		echo "Manifest -> $manifest"
 	fi
+	# update format in the manifest
+	sudo sed -i "s/MANIFEST.*/MANIFEST\\t$(cat "$version_path"/format)/" "$manifest"
 	
 	# 2) Create one directory for the bundle and add it the requested
 	# times to the manifest.
@@ -962,8 +1127,11 @@ create_bundle() {
 	# Create a zero pack for the bundle and add the directory to it
 	add_to_pack "$bundle_name" "$bundle_dir"
 	for val in "${dir_list[@]}"; do
+		if [[ "$val" != "/"* ]]; then
+			val=/"$val"
+		fi
 		# the "/" directory is not allowed in the manifest
-		if [ val != "/" ]; then
+		if [ "$val" != "/" ]; then
 			add_to_manifest "$manifest" "$bundle_dir" "$val"
 			if [ "$local_bundle" = true ]; then
 				sudo mkdir -p "$target_path$val"
@@ -973,6 +1141,9 @@ create_bundle() {
 	
 	# 3) Create the requested file(s)
 	for val in "${file_list[@]}"; do
+		if [[ "$val" != "/"* ]]; then
+			val=/"$val"
+		fi
 		# if the directories the file is don't exist, add them to the bundle
 		# there are 2 exceptions, the dir of the tracking file and "\"
 		fdir=$(dirname "${val%:*}")
@@ -1011,6 +1182,9 @@ create_bundle() {
 	
 	# 4) Create the requested link(s) in the bundle
 	for val in "${link_list[@]}"; do
+		if [[ "$val" != "/"* ]]; then
+			val=/"$val"
+		fi
 		# if the directory the link is doesn't exist,
 		# add it to the bundle (except if the directory is "/")
 		fdir=$(dirname "$val")
@@ -1042,6 +1216,9 @@ create_bundle() {
 	
 	# 5) Create the requested dangling link(s) in the bundle
 	for val in "${dangling_link_list[@]}"; do
+		if [[ "$val" != "/"* ]]; then
+			val=/"$val"
+		fi
 		# if the directory the link is doesn't exist,
 		# add it to the bundle (except if the directory is "/")
 		fdir=$(dirname "$val")
@@ -1225,7 +1402,7 @@ install_bundle() {
 # Parameters:
 # - ENVIRONMENT_NAME: the name of the test environment
 # - BUNDLE_NAME: the name of the bundle to be updated
-# - OPTION: the kind of update to be performed { --add, --delete, --ghost, --rename, --update }
+# - OPTION: the kind of update to be performed { --add, --add-dir, --delete, --ghost, --rename, --rename-legacy, --update }
 # - FILE_NAME: file or directory of the bundle to add or update
 # - NEW_NAME: when --rename is chosen this parameter receives the new name to assign
 update_bundle() {
@@ -1252,16 +1429,18 @@ update_bundle() {
 	local new_fsize
 	local new_fname
 	local delta_name
+	local format
 
 	# If no parameters are received show usage
 	if [ $# -eq 0 ]; then
 		echo "$(cat <<-EOM
 			Usage:
 			    update_bundle <environment_name> <bundle_name> --add <file_name>[:<path_to_existing_file>]
+			    update_bundle <environment_name> <bundle_name> --add-dir <directory_name>
 			    update_bundle <environment_name> <bundle_name> --delete <file_name>
 			    update_bundle <environment_name> <bundle_name> --ghost <file_name>
 			    update_bundle <environment_name> <bundle_name> --update <file_name>
-			    update_bundle <environment_name> <bundle_name> --rename <file_name> <new_name>
+			    update_bundle <environment_name> <bundle_name> --rename[-legacy] <file_name> <new_name>
 			    
 			EOM
 		)"
@@ -1273,8 +1452,14 @@ update_bundle() {
 	validate_param "$option"
 	validate_param "$fname"
 
-	version=$(sudo cat "$env_name"/web-dir/version/formatstaging/latest)
+	# make sure fname starts with a slash
+	if [[ "$fname" != "/"* ]]; then
+		fname=/"$fname"
+	fi
+	# the version where the update will be created is the latest version
+	version=("$(ls "$env_name"/web-dir | grep -E '^[0-9]+$' | sort -rn | head -n1)")
 	version_path="$env_name"/web-dir/"$version"
+	format=$(cat "$version_path"/format)
 	# find the previous version of this bundle manifest
 	oldversion="$version"
 	while [ "$oldversion" -gt 0 ] && [ ! -e "$env_name"/web-dir/"$oldversion"/Manifest."$bundle" ]; do
@@ -1292,6 +1477,7 @@ update_bundle() {
 	if [ ! -e "$bundle_manifest" ]; then
 		sudo cp "$oldversion_path"/Manifest."$bundle" "$bundle_manifest"
 	fi
+	sudo sed -i "s/MANIFEST.*/MANIFEST\\t$format/" "$bundle_manifest"
 	sudo sed -i "s/version:.*/version:\\t$version/" "$bundle_manifest"
 	sudo sed -i "s/previous:.*/previous:\\t$oldversion/" "$bundle_manifest"
 	sudo sed -i "s/timestamp:.*/timestamp:\\t$(date +"%s")/" "$bundle_manifest"
@@ -1302,7 +1488,7 @@ update_bundle() {
 	contentsize=$(awk '/contentsize/ { print $2 }' "$bundle_manifest")
 
 	# these actions apply to all operations except when adding a new file
-	if [ "$option" != "--add" ]; then
+	if [ "$option" != "--add" ] && [ "$option" != "--add-dir" ] && [ "$option" != "--add-file" ]; then
 		fhash=$(get_hash_from_manifest "$bundle_manifest" "$fname")
 		fsize=$(stat -c "%s" "$oldversion_path"/files/"$fhash")
 		fname="${fname////\\/}"  # replacing every / with \/ in fname to escape them
@@ -1312,7 +1498,7 @@ update_bundle() {
 	fi
 
 	case "$option" in
-	--add)
+	--add | --add-file)
 		# if the directories the file is don't exist, add them to the bundle
 		fdir=$(dirname "${fname%:*}")
 		if [ ! "$(sudo cat "$bundle_manifest" | grep -x "D\\.\\.\\..*$fdir")" ] && [ "$fdir" != "/" ]; then
@@ -1332,7 +1518,8 @@ update_bundle() {
 		if [[ "$fname" = *":"* ]]; then
 			new_file="${fname#*:}"
 			validate_item "$new_file"
-			sudo cp "$new_file".* "$version_path"/files/"$(basename "$new_file")"
+			sudo cp "$new_file" "$version_path"/files/"$(basename "$new_file")"
+			sudo cp "$new_file".tar "$version_path"/files/"$(basename "$new_file")".tar
 			new_file="$version_path"/files/"$(basename "$new_file")"
 			fname="${fname%:*}"
 		else
@@ -1346,6 +1533,24 @@ update_bundle() {
 		add_to_pack "$bundle" "$new_file"
 		# Add the file also to the delta-pack
 		add_to_pack "$bundle" "$new_file" "$oldversion"
+		;;
+	--add-dir)
+		# if the directories the file is don't exist, add them to the bundle
+		fdir="$fname"
+		if [ ! "$(sudo cat "$bundle_manifest" | grep -x "D\\.\\.\\..*$fdir")" ] && [ "$fdir" != "/" ]; then
+			new_dir=$(create_dir "$version_path"/files)
+			add_to_manifest "$bundle_manifest" "$new_dir" "$fdir"
+			# add each one of the directories of the path if they are not in the manifest already
+			while [ "$(dirname "$fdir")" != "/" ]; do
+				fdir=$(dirname "$fdir")
+				if [ ! "$(sudo cat "$bundle_manifest" | grep -x "D\\.\\.\\..*$fdir")" ]; then
+					add_to_manifest "$bundle_manifest" "$new_dir" "$fdir"
+				fi
+			done
+			# Add the dir to the delta-pack
+			add_to_pack "$bundle" "$new_dir" "$oldversion"
+		fi
+		contentsize=$(awk '/contentsize/ { print $2 }' "$bundle_manifest")
 		;;
 	--delete | --ghost)
 		# replace the first character of the line that matches with "."
@@ -1391,27 +1596,34 @@ update_bundle() {
 		# create or add to the delta-pack
 		add_to_pack "$bundle" "$version_path"/delta/"$delta_name" "$oldversion"
 		;;
-	--rename)
+	--rename | --rename-legacy)
 		validate_param "$new_name"
+		# make sure new_name starts with a slash
+		if [[ "$new_name" != "/"* ]]; then
+			new_name=/"$new_name"
+		fi
 		new_fname="${new_name////\\/}"
 		# renames need two records in the manifest, one with the
 		# new name (F...) and one with the old one (.d..)
-		# replace the first character of the line that matches with "."
+		# replace the first character of the old record with "."
 		sudo sed -i "/\\t$fname$/s/./\./1" "$bundle_manifest"
 		sudo sed -i "/\\t$fname\\t/s/./\./1" "$bundle_manifest"
-		# replace the second character with "d"
+		# replace the second character of the old record with "d"
 		sudo sed -i "/\\t$fname$/s/./d/2" "$bundle_manifest"
 		sudo sed -i "/\\t$fname\\t/s/./d/2" "$bundle_manifest"
-		# replace the hash with 0s
-		sudo sed -i "/\\t$fname$/s/\(....\\t\).*\(\\t.*\\t\)/\1$zero_hash\2/g" "$bundle_manifest"
-		sudo sed -i "/\\t$fname\\t/s/\(....\\t\).*\(\\t.*\\t\)/\1$zero_hash\2/g" "$bundle_manifest"
-		# replace the fourth character of the line that matches with "r" (no longer applicable)
-		#sudo sed -i "/\\t$fname$/s/./r/4" "$bundle_manifest"
-		#sudo sed -i "/\\t$fname\\t/s/./r/4" "$bundle_manifest"
 		# add the new name to the manifest
 		add_to_manifest "$bundle_manifest" "$oldversion_path"/files/"$fhash" "$new_name"
-		# replace the fourth character of the line that matches the new name with "r" (no longer applicable)
-		#sudo sed -i "/\\t$new_fname$/s/./r/4" "$bundle_manifest"
+		if [ "$option" = "--rename" ]; then
+			# replace the hash of the old record with 0s
+			sudo sed -i "/\\t$fname$/s/\(....\\t\).*\(\\t.*\\t\)/\1$zero_hash\2/g" "$bundle_manifest"
+			sudo sed -i "/\\t$fname\\t/s/\(....\\t\).*\(\\t.*\\t\)/\1$zero_hash\2/g" "$bundle_manifest"
+		else
+			# replace the fourth character of the old record with "r"
+			sudo sed -i "/\\t$fname$/s/./r/4" "$bundle_manifest"
+			sudo sed -i "/\\t$fname\\t/s/./r/4" "$bundle_manifest"
+			# replace the fourth character of the new record with "r"
+			sudo sed -i "/\\t$new_fname$/s/./r/4" "$bundle_manifest"
+		fi
 		# create the delta-file
 		delta_name="$oldversion-$version-$fhash-$fhash"
 		sudo bsdiff "$oldversion_path"/files/"$fhash" "$oldversion_path"/files/"$fhash" "$version_path"/delta/"$delta_name"
@@ -1536,8 +1748,13 @@ generate_test() {
 		printf '\t# global cleanup\n\n'
 		printf '}\n\n'
 		printf '@test "<test description>" {\n\n'
-		printf '\trun sudo sh -c "$SWUPD <swupd_command> $SWUPD_OPTS <command_options>"\n'
-		printf '\t# <validations>\n\n'
+		printf '\trun sudo sh -c "$SWUPD <swupd_command> $SWUPD_OPTS <command_options>"\n\n'
+		printf '\t# assert_status_is 0\n'
+		printf '\t# expected_output=$(cat <<-EOM\n'
+		printf '\t# \t<expected output>\n'
+		printf '\t# EOM\n'
+		printf '\t# )\n'
+		printf '\t# assert_is_output "$expected_output"\n\n'
 		printf '}\n\n'
 	} > "$path$name".bats
 	# make the test script executable
