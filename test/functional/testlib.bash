@@ -529,7 +529,7 @@ remove_from_manifest() {
 	sudo sed -i "/\\t$item\\t/d" "$manifest"
 	# decrease filecount and contentsize
 	filecount=$(awk '/filecount/ { print $2}' "$manifest")
-	filecount=$((filecount + 1))
+	filecount=$((filecount - 1))
 	sudo sed -i "s/filecount:.*/filecount:\\t$filecount/" "$manifest"
 	if [ "$(basename "$manifest")" != Manifest.MoM ]; then
 		contentsize=$(awk '/contentsize/ { print $2}' "$manifest")
@@ -681,10 +681,13 @@ bump_format() {
 	local format
 	local version
 	local previous_version
+	local new_version
+	local middle_version
+	local new_version_path
+	local middle_version_path
 	local mom
 	local manifest
 	local bundles
-	local version_path
 	
 	# If no parameters are received show usage
 	if [ $# -eq 0 ]; then
@@ -699,46 +702,79 @@ bump_format() {
 
 	validate_path "$env_name"
 
-	# find the latest MoM
+	# find the latest version and MoM
 	version=("$(ls "$env_name"/web-dir | grep -E '^[0-9]+$' | sort -rn | head -n1)")
-	version_path="$env_name"/web-dir/"$version"
-	format="$(cat "$version_path"/format)"
-	mom="$version_path"/Manifest.MoM
+	middle_version="$((version+10))"
+	middle_version_path="$env_name"/web-dir/"$middle_version"
+	new_version="$((version+20))"
+	new_version_path="$env_name"/web-dir/"$new_version"
+	format="$(cat "$env_name"/web-dir/"$version"/format)"
+	mom="$new_version_path"/Manifest.MoM
+
+	# create two new versions for the format bump, each version separated by 10
+	# from each other and from the current latest version
+	create_version -e "$env_name" "$((version+10))" "$version" "$format"
+	create_version "$env_name" "$new_version" "$((version+10))" "$((format+1))"
 
 	# copy all manifests in MoM to current version
 	bundles=($(cat "$mom" | grep -x "M\.\.\..*" | awk '{ print $4 }'))
 	IFS=$'\n'
 	for bundle in ${bundles[*]}; do
 		# search for the latest manifest version for the bundle
-		manifest="$env_name"/web-dir/"$version"/Manifest."$bundle"
+		manifest="$new_version_path"/Manifest."$bundle"
 		if [ ! -e "$manifest" ]; then
-			previous_version="$version"
+			previous_version="$new_version"
 			while [ "$previous_version" -gt 0 ] && [ ! -e "$manifest" ]; do
 				previous_version="$(awk '/previous/ { print $2 }' "$mom")"
 				manifest="$env_name"/web-dir/"$previous_version"/Manifest."$bundle"
+				mom="$env_name"/web-dir/"$previous_version"/Manifest.MoM
 			done
-			sudo cp "$manifest" "$env_name"/web-dir/"$version"/Manifest."$bundle"
-			manifest="$env_name"/web-dir/"$version"/Manifest."$bundle"
+			sudo cp "$manifest" "$env_name"/web-dir/"$new_version"/Manifest."$bundle"
+			manifest="$env_name"/web-dir/"$new_version"/Manifest."$bundle"
+			mom="$env_name"/web-dir/"$new_version"/Manifest.MoM
 			# copy the zero pack also from the old version to the new one
-			sudo cp "$env_name"/web-dir/"$previous_version"/pack-"$bundle"-from-0.tar "$env_name"/web-dir/"$version"/pack-"$bundle"-from-0.tar
+			sudo cp "$env_name"/web-dir/"$previous_version"/pack-"$bundle"-from-0.tar "$env_name"/web-dir/"$new_version"/pack-"$bundle"-from-0.tar
 			# extract the content of the zero pack in the files directory so we have
 			# all files available to create future delta packs
-			sudo tar -xf "$env_name"/web-dir/"$version"/pack-"$bundle"-from-0.tar --strip-components 1 --directory "$env_name"/web-dir/"$version"/files
-			files=("$(ls "$env_name"/web-dir/"$version"/files)")
+			sudo tar -xf "$env_name"/web-dir/"$new_version"/pack-"$bundle"-from-0.tar --strip-components 1 --directory "$env_name"/web-dir/"$new_version"/files
+			files=("$(ls -I "*.tar" "$env_name"/web-dir/"$new_version"/files)")
 			for bundle_file in ${files[*]}; do
-				create_tar "$env_name"/web-dir/"$version"/files/"$bundle_file"
+				if [ ! -e "$env_name"/web-dir/"$new_version"/files/"$bundle_file".tar ]; then
+					create_tar "$env_name"/web-dir/"$new_version"/files/"$bundle_file"
+				fi
 			done
 		fi
 		# update manifest headers
-		sudo sed -i "s/MANIFEST.*/MANIFEST\\t$format/" "$manifest"
-		sudo sed -i "s/version:.*/version:\\t$version/" "$manifest"
+		sudo sed -i "s/MANIFEST.*/MANIFEST\\t$((format+1))/" "$manifest"
+		sudo sed -i "s/version:.*/version:\\t$new_version/" "$manifest"
 		sudo sed -i "s/previous:.*/previous:\\t$previous_version/" "$manifest"
 		# update manifest content with latest version
-		sudo sed -i "/....\\t.*\\t.*\\t.*$/s/\(....\\t.*\\t\).*\(\\t\)/\1$version\2/g" "$manifest"
+		sudo sed -i "/....\\t.*\\t.*\\t.*$/s/\(....\\t.*\\t\).*\(\\t\)/\1$new_version\2/g" "$manifest"
+		sudo rm -rf "$manifest".tar
 		create_tar "$manifest"
 	done
 	unset IFS
 
+	update_hashes_in_mom "$mom"
+
+	# update the middle version
+	sudo rm "$middle_version_path"/files/*
+	sudo cp -r "$new_version_path"/files/* "$middle_version_path"/files/
+	sudo cp -n "$new_version_path"/Manifest.* "$middle_version_path"/
+	sudo cp -n "$new_version_path"/pack* "$middle_version_path"/
+	mom="$middle_version_path"/Manifest.MoM
+	bundles=($(cat "$mom" | grep -x "M\.\.\..*" | awk '{ print $4 }'))
+	IFS=$'\n'
+	for bundle in ${bundles[*]}; do
+		manifest="$middle_version_path"/Manifest."$bundle"
+		sudo sed -i "s/MANIFEST.*/MANIFEST\\t$((format))/" "$manifest"
+		sudo sed -i "s/version:.*/version:\\t$middle_version/" "$manifest"
+		sudo sed -i "s/previous:.*/previous:\\t$version/" "$manifest"
+		sudo sed -i "/....\\t.*\\t.*\\t.*$/s/\(....\\t.*\\t\).*\(\\t\)/\1$middle_version\2/g" "$manifest"
+		sudo rm -rf "$manifest".tar
+		create_tar "$manifest"
+	done
+	unset IFS
 	update_hashes_in_mom "$mom"
 
 }
@@ -847,12 +883,16 @@ set_latest_version() {
 
 # Creates a new version of the server side content
 # Parameters:
+# - -e: if this option is set the version is created empty (withouth bundle os-core)
+#       even if the previous version had os-core
 # - ENVIRONMENT_NAME: the name of the test environment
 # - VERSION: the version of the server side content
 # - FROM_VERSION: the previous version, if nothing is selected defaults to 0
 # - FORMAT: the format to use for the version
 create_version() {
 
+	local empty=false
+	[ "$1" = "-e" ] && { empty=true ; shift ; }
 	local env_name=$1
 	local version=$2
 	local from_version=${3:-0}
@@ -864,8 +904,11 @@ create_version() {
 	if [ $# -eq 0 ]; then
 		echo "$(cat <<-EOM
 			Usage:
-			    create_version <environment_name> <new_version> [from_version] [format]
+			    create_version [-e] <environment_name> <new_version> [from_version] [format]
 			    
+			Options:
+			    -e    If set, the new version is created empty (without os-core bundle), otherwise
+			          it will include an update to bundle os-core by default.
 			EOM
 		)"
 		return
@@ -926,22 +969,24 @@ create_version() {
 		create_tar "$mom"
 		sign_manifest "$mom"
 		# when creating a new version we need to make an update to os-release and format
-		# files in the os-core bundle (unless it does not exist)
-		oldversion="$version"
-		while [ "$oldversion" -gt 0 ] && [ ! -e "$env_name"/web-dir/"$oldversion"/Manifest.os-core ]; do
-			oldversion=$(awk '/previous/ { print $2 }' "$env_name"/web-dir/"$oldversion"/Manifest.MoM)
-		done
-		# if no os-core manifest was found, nothing else needs to be done
-		if [ -e "$env_name"/web-dir/"$oldversion"/Manifest.os-core ]; then
-			update_bundle "$env_name" os-core --header-only
-			if [ ! -z $(get_hash_from_manifest "$env_name"/web-dir/"$oldversion"/Manifest.os-core /usr/lib/os-release) ]; then
-				remove_from_manifest "$env_name"/web-dir/"$version"/Manifest.os-core /usr/lib/os-release
+		# files in the os-core bundle (unless otherwise specified or if bundle does not exist)
+		if [ "$empty" = false ]; then
+			oldversion="$version"
+			while [ "$oldversion" -gt 0 ] && [ ! -e "$env_name"/web-dir/"$oldversion"/Manifest.os-core ]; do
+				oldversion=$(awk '/previous/ { print $2 }' "$env_name"/web-dir/"$oldversion"/Manifest.MoM)
+			done
+			# if no os-core manifest was found, nothing else needs to be done
+			if [ -e "$env_name"/web-dir/"$oldversion"/Manifest.os-core ]; then
+				update_bundle "$env_name" os-core --header-only
+				if [ ! -z $(get_hash_from_manifest "$env_name"/web-dir/"$oldversion"/Manifest.os-core /usr/lib/os-release) ]; then
+					remove_from_manifest "$env_name"/web-dir/"$version"/Manifest.os-core /usr/lib/os-release
+				fi
+				update_bundle "$env_name" os-core --add /usr/lib/os-release:"$OS_RELEASE"
+				if [ ! -z $(get_hash_from_manifest "$env_name"/web-dir/"$oldversion"/Manifest.os-core /usr/share/defaults/swupd/format) ]; then
+					remove_from_manifest "$env_name"/web-dir/"$version"/Manifest.os-core /usr/share/defaults/swupd/format
+				fi
+				update_bundle "$env_name" os-core --add /usr/share/defaults/swupd/format:"$FORMAT"
 			fi
-			update_bundle "$env_name" os-core --add /usr/lib/os-release:"$OS_RELEASE"
-			if [ ! -z $(get_hash_from_manifest "$env_name"/web-dir/"$oldversion"/Manifest.os-core /usr/share/defaults/swupd/format) ]; then
-				remove_from_manifest "$env_name"/web-dir/"$version"/Manifest.os-core /usr/share/defaults/swupd/format
-			fi
-			update_bundle "$env_name" os-core --add /usr/share/defaults/swupd/format:"$FORMAT"
 		fi
 	fi
 
