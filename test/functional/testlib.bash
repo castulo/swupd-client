@@ -524,9 +524,6 @@ remove_from_manifest() {
 
 	# replace every / with \/ in item (if any)
 	item="${item////\\/}"
-	# remove the lines that match from the manifest
-	sudo sed -i "/\\t$item$/d" "$manifest"
-	sudo sed -i "/\\t$item\\t/d" "$manifest"
 	# decrease filecount and contentsize
 	filecount=$(awk '/filecount/ { print $2}' "$manifest")
 	filecount=$((filecount - 1))
@@ -538,6 +535,9 @@ remove_from_manifest() {
 		contentsize=$((contentsize - item_size))
 		sudo sed -i "s/contentsize:.*/contentsize:\\t$contentsize/" "$manifest"
 	fi
+	# remove the lines that match from the manifest
+	sudo sed -i "/\\t$item$/d" "$manifest"
+	sudo sed -i "/\\t$item\\t/d" "$manifest"
 	# If a manifest tar already exists for that manifest, renew the manifest tar
 	sudo rm -f "$manifest".tar
 	create_tar "$manifest"
@@ -713,8 +713,8 @@ bump_format() {
 
 	# create two new versions for the format bump, each version separated by 10
 	# from each other and from the current latest version
-	create_version -e "$env_name" "$((version+10))" "$version" "$format"
-	create_version "$env_name" "$new_version" "$((version+10))" "$((format+1))"
+	create_version "$env_name" "$((version+10))" "$version" "$format"
+	create_version -u "$env_name" "$new_version" "$((version+10))" "$((format+1))"
 
 	# copy all manifests in MoM to current version
 	bundles=($(cat "$mom" | grep -x "M\.\.\..*" | awk '{ print $4 }'))
@@ -743,11 +743,10 @@ bump_format() {
 					create_tar "$env_name"/web-dir/"$new_version"/files/"$bundle_file"
 				fi
 			done
+			sudo sed -i "s/version:.*/version:\\t$new_version/" "$manifest"
+			sudo sed -i "s/previous:.*/previous:\\t$previous_version/" "$manifest"
 		fi
-		# update manifest headers
 		sudo sed -i "s/MANIFEST.*/MANIFEST\\t$((format+1))/" "$manifest"
-		sudo sed -i "s/version:.*/version:\\t$new_version/" "$manifest"
-		sudo sed -i "s/previous:.*/previous:\\t$previous_version/" "$manifest"
 		# update manifest content with latest version
 		sudo sed -i "/....\\t.*\\t.*\\t.*$/s/\(....\\t.*\\t\).*\(\\t\)/\1$new_version\2/g" "$manifest"
 		sudo rm -rf "$manifest".tar
@@ -883,16 +882,16 @@ set_latest_version() {
 
 # Creates a new version of the server side content
 # Parameters:
-# - -e: if this option is set the version is created empty (withouth bundle os-core)
-#       even if the previous version had os-core
+# - -u: if this option is set the new version includes an update to os-core (files:
+#       os-release and format)
 # - ENVIRONMENT_NAME: the name of the test environment
 # - VERSION: the version of the server side content
 # - FROM_VERSION: the previous version, if nothing is selected defaults to 0
 # - FORMAT: the format to use for the version
 create_version() {
 
-	local empty=false
-	[ "$1" = "-e" ] && { empty=true ; shift ; }
+	local empty=true
+	[ "$1" = "-u" ] && { empty=false ; shift ; }
 	local env_name=$1
 	local version=$2
 	local from_version=${3:-0}
@@ -907,8 +906,8 @@ create_version() {
 			    create_version [-e] <environment_name> <new_version> [from_version] [format]
 			    
 			Options:
-			    -e    If set, the new version is created empty (without os-core bundle), otherwise
-			          it will include an update to bundle os-core by default.
+			    -u    If set, the new version is created wit an update to the os-core bundle
+			          (in files os-release and format), otherwise the new version will be empty.
 			EOM
 		)"
 		return
@@ -1008,6 +1007,7 @@ create_test_environment() {
 	[ "$1" = "-u" ] && { minimal_os_core=false ; shift ; }
 	local env_name=$1 
 	local version=${2:-10}
+	local format=${3:-staging}
 
 	# If no parameters are received show usage
 	if [ $# -eq 0 ]; then
@@ -1030,7 +1030,7 @@ create_test_environment() {
 	# create all the files and directories needed
 	# web-dir files & dirs
 	sudo mkdir -p "$env_name"
-	create_version "$env_name" "$version"
+	create_version "$env_name" "$version" "0" "$format"
 
 	# target-dir files & dirs
 	sudo mkdir -p "$env_name"/target-dir/usr/lib
@@ -1558,10 +1558,10 @@ update_bundle() {
 	sudo sed -i "s/MANIFEST.*/MANIFEST\\t$format/" "$bundle_manifest"
 	sudo sed -i "s/version:.*/version:\\t$version/" "$bundle_manifest"
 	sudo sed -i "s/previous:.*/previous:\\t$oldversion/" "$bundle_manifest"
-	sudo sed -i "s/timestamp:.*/timestamp:\\t$(date +"%s")/" "$bundle_manifest"
 	# copy also the zero pack
 	if [ ! -e "$version_path"/pack-"$bundle"-from-0.tar ]; then
 		sudo cp "$oldversion_path"/pack-"$bundle"-from-0.tar "$version_path"/
+		sudo tar -xf "$version_path"/pack-"$bundle"-from-0.tar --strip-components 1 --directory "$version_path"/files
 	fi
 	contentsize=$(awk '/contentsize/ { print $2 }' "$bundle_manifest")
 
