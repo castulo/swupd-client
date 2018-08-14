@@ -703,7 +703,7 @@ bump_format() {
 	validate_path "$env_name"
 
 	# find the latest version and MoM
-	version=("$(ls "$env_name"/web-dir | grep -E '^[0-9]+$' | sort -rn | head -n1)")
+	version="$(ls "$env_name"/web-dir | grep -E '^[0-9]+$' | sort -rn | head -n1)"
 	middle_version="$((version+10))"
 	middle_version_path="$env_name"/web-dir/"$middle_version"
 	new_version="$((version+20))"
@@ -713,8 +713,11 @@ bump_format() {
 
 	# create two new versions for the format bump, each version separated by 10
 	# from each other and from the current latest version
-	create_version "$env_name" "$((version+10))" "$version" "$format"
-	create_version -u "$env_name" "$new_version" "$((version+10))" "$((format+1))"
+	create_version "$env_name" "$middle_version" "$version" "$format"
+	create_version -u "$env_name" "$new_version" "$middle_version" "$((format+1))"
+	# regardless of where we found the previous version of os-core, update
+	# the previous version to $middle_version
+	sudo sed -i "s/previous:.*/previous:\\t$middle_version/" "$new_version_path"/Manifest.os-core
 
 	# copy all manifests in MoM to current version
 	bundles=($(cat "$mom" | grep -x "M\.\.\..*" | awk '{ print $4 }'))
@@ -757,11 +760,17 @@ bump_format() {
 	update_hashes_in_mom "$mom"
 
 	# update the middle version
-	sudo rm "$middle_version_path"/files/*
+	sudo rm -rf "$middle_version_path"/files/*
+	sudo rm -f "$middle_version_path"/Manifest*
+	sudo rm -f "$middle_version_path"/pack*
 	sudo cp -r "$new_version_path"/files/* "$middle_version_path"/files/
-	sudo cp -n "$new_version_path"/Manifest.* "$middle_version_path"/
-	sudo cp -n "$new_version_path"/pack* "$middle_version_path"/
+	sudo cp "$new_version_path"/Manifest.* "$middle_version_path"/
+	sudo cp "$new_version_path"/pack* "$middle_version_path"/
 	mom="$middle_version_path"/Manifest.MoM
+	sudo sed -i "s/MANIFEST.*/MANIFEST\\t$((format))/" "$mom"
+	sudo sed -i "s/version:.*/version:\\t$middle_version/" "$mom"
+	sudo sed -i "s/previous:.*/previous:\\t$version/" "$mom"
+	sudo sed -i "/....\\t.*\\t.*\\t.*$/s/\(....\\t.*\\t\).*\(\\t\)/\1$middle_version\2/g" "$mom"
 	bundles=($(cat "$mom" | grep -x "M\.\.\..*" | awk '{ print $4 }'))
 	IFS=$'\n'
 	for bundle in ${bundles[*]}; do
@@ -903,7 +912,7 @@ create_version() {
 	if [ $# -eq 0 ]; then
 		echo "$(cat <<-EOM
 			Usage:
-			    create_version [-e] <environment_name> <new_version> [from_version] [format]
+			    create_version [-u] <environment_name> <new_version> [from_version] [format]
 			    
 			Options:
 			    -u    If set, the new version is created wit an update to the os-core bundle
@@ -1013,7 +1022,7 @@ create_test_environment() {
 	if [ $# -eq 0 ]; then
 		echo "$(cat <<-EOM
 			Usage:
-			    create_test_environment [-e] <environment_name> [initial_version]
+			    create_test_environment [-e|-u] <environment_name> [initial_version]
 			    
 			Options:
 			    -e    If set, the test environment is created empty, otherwise it will have
@@ -1189,7 +1198,8 @@ create_bundle() {
 
 	# set default values
 	bundle_name=${bundle_name:-$(generate_random_name test-bundle-)}
-	version=${version:-10}
+	# if no version was provided create the bundle in the earliest version by default
+	version=${version:-$(ls "$env_name"/web-dir | grep -E '^[0-9]+$' | sort -rn | head -n1)}
 	# all bundles should include their own tracking file, so append it to the
 	# list of files to be created in the bundle
 	file_list+=(/usr/share/clear/bundles/"$bundle_name")
@@ -1504,6 +1514,8 @@ update_bundle() {
 	local new_fname
 	local delta_name
 	local format
+	local files
+	local bundle_file
 
 	# If no parameters are received show usage
 	if [ $# -eq 0 ]; then
@@ -1535,13 +1547,13 @@ update_bundle() {
 		fname=/"$fname"
 	fi
 	# the version where the update will be created is the latest version
-	version=("$(ls "$env_name"/web-dir | grep -E '^[0-9]+$' | sort -rn | head -n1)")
+	version="$(ls "$env_name"/web-dir | grep -E '^[0-9]+$' | sort -rn | head -n1)"
 	version_path="$env_name"/web-dir/"$version"
 	format=$(cat "$version_path"/format)
 	# find the previous version of this bundle manifest
 	oldversion="$version"
 	while [ "$oldversion" -gt 0 ] && [ ! -e "$env_name"/web-dir/"$oldversion"/Manifest."$bundle" ]; do
-			oldversion=$(awk '/previous/ { print $2 }' "$env_name"/web-dir/"$oldversion"/Manifest.MoM)
+		oldversion=$(awk '/previous/ { print $2 }' "$env_name"/web-dir/"$oldversion"/Manifest.MoM)
 	done
 	if [ "$oldversion" = "$version" ]; then
 		# if old version and new version are the same it means this bundle has already
@@ -1562,6 +1574,12 @@ update_bundle() {
 	if [ ! -e "$version_path"/pack-"$bundle"-from-0.tar ]; then
 		sudo cp "$oldversion_path"/pack-"$bundle"-from-0.tar "$version_path"/
 		sudo tar -xf "$version_path"/pack-"$bundle"-from-0.tar --strip-components 1 --directory "$version_path"/files
+		files=("$(ls -I "*.tar" "$version_path"/files)")
+		for bundle_file in ${files[*]}; do
+			if [ ! -e "$version_path"/files/"$bundle_file".tar ]; then
+				create_tar "$version_path"/files/"$bundle_file"
+			fi
+		done
 	fi
 	contentsize=$(awk '/contentsize/ { print $2 }' "$bundle_manifest")
 
@@ -1626,6 +1644,7 @@ update_bundle() {
 				fi
 			done
 			# Add the dir to the delta-pack
+			add_to_pack "$bundle" "$new_dir"
 			add_to_pack "$bundle" "$new_dir" "$oldversion"
 		fi
 		contentsize=$(awk '/contentsize/ { print $2 }' "$bundle_manifest")
