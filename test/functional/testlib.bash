@@ -2279,7 +2279,7 @@ use_ignore_list() {
 		elif [ -f "$THEME_DIRNAME"/ignore-list ]; then
 			ignore_list="$THEME_DIRNAME"/ignore-list
 		elif [ -f "$FUNC_DIR"/ignore-list ]; then
-			ignore_list="$FUNC_DIR"/ignore-list.global
+			ignore_list="$FUNC_DIR"/ignore-list
 		fi
 		while IFS= read -r line; do
 			# if the pattern from the file has a "/" escape it first so it does
