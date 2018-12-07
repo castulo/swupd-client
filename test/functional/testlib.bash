@@ -286,9 +286,6 @@ set_env_variables() { # swupd_function
 	if [ -f "$PORT_FILE" ]; then
 		PORT=$(cat "$PORT_FILE")
 		export PORT
-		export SWUPD_OPTS_HTTPS="$SWUPD_OPTS -u https://localhost:$PORT/$env_name/web-dir"
-		export SWUPD_OPTS_HTTP="$SWUPD_OPTS -u http://localhost:$PORT/$env_name/web-dir"
-		export SWUPD_OPTS_HTTP_NO_CERT="-S $path/$env_name/state -p $path/$env_name/target-dir -F staging -u http://localhost:$PORT/$env_name/web-dir/"
 	fi
 
 	if [ -f "$SERVER_PID_FILE" ]; then
