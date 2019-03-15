@@ -36,9 +36,9 @@ script:
         - autoreconf --verbose --warnings=none --install --force &&
           ./configure CFLAGS="$CFLAGS -fsanitize=address -Werror" --prefix=/usr --with-fallback-capaths=$TRAVIS_BUILD_DIR/swupd_test_certificates --with-systemdsystemunitdir=/usr/lib/systemd/system &&
           make -j48 &&
-          sudo sh -c 'umask 0022 && make -j48 check' &&
           sudo sh -c 'umask 0022 && make install' &&
           sudo sh -c 'umask 0022 && make install-check' &&
           make compliant &&
           make shellcheck
-after_failure: cat test-suite.log
+
+after_success: sudo sh -c 'umask 0022 && make -j48 check' || cat test-suite.log
