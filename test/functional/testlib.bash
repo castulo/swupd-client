@@ -168,6 +168,9 @@ print_stack() {
 			echo -e "\\t$func"
 		fi
 	done
+	local a
+	local b
+	echo $b
 
 }
 
