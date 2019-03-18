@@ -4,7 +4,16 @@ language: c
 
 env:
     global:
-        - MAKEFLAGS="-j 32"
+        - MAKEFLAGS="-j 2"
+    matrix:
+        - FUNCTIONAL=test/functional/update/{update-boot-file.bats,update-boot-skip.bats,update-bundle-removed.bats,update-client-certificate.bats,update-download.bats,update-fail-to-get-mom.bats,update-include.bats,update-include-old-bundle.bats,update-include-old-bundle-with-tracked-file.bats}
+        - FUNCTIONAL=test/functional/update/{update-manifest-delta.bats,update-minversion.bats,update-missing-os-core.bats,update-newest-added.bats,update-newest-deleted.bats,update-newest-ghosted.bats,update-no-disk-space.bats,update-non-responsive.bats,update-older-server-version.bats,update-rename.bats}
+        - FUNCTIONAL=test/functional/verify
+        - FUNCTIONAL=test/functional/bundleadd
+        - FUNCTIONAL=test/functional/bundleremove
+        - FUNCTIONAL=test/functional/bundlelist
+        - FUNCTIONAL=test/functional/search
+        - FUNCTIONAL=test/functional/{checkupdate,hashdump,mirror,usability}
 
 # Pre-install missing build dependencies:
 # - libcheck 0.9.10 is slightly too old, since 0.9.12 adds TAP support
@@ -39,13 +48,12 @@ before_script:
         - ./configure CFLAGS="$CFLAGS -fsanitize=address -Werror" --prefix=/usr --with-fallback-capaths=$TRAVIS_BUILD_DIR/swupd_test_certificates --with-systemdsystemunitdir=/usr/lib/systemd/system
         - make compliant
         - make shellcheck
+        - bats test/functional/generate-cert.prereq
 
 # Ubuntu's default umask is 0002, but this break's swupd hash calculations.
 script:
         - sudo find test/functional -exec chmod g-w {} \;
         - make &&
-          make check &&
           sudo sh -c 'umask 0022 && make install' &&
           sudo sh -c 'umask 0022 && make install-check'
-
-after_failure: cat test-suite.log
+        - bats "$FUNCTIONAL"
