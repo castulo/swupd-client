@@ -4,7 +4,13 @@ language: c
 
 env:
     global:
-        - MAKEFLAGS="-j 32"
+        - MAKEFLAGS="-j 2"
+    matrix:
+        - FUNCTIONAL_TESTS=update
+        - FUNCTIONAL_TESTS=verify
+        - FUNCTIONAL_TESTS=bundleadd,bundleremove
+        - FUNCTIONAL_TESTS="bundlelist,search"
+        - FUNCTIONAL_TESTS="{checkupdate,hashdump,mirror,usability}"
 
 # Pre-install missing build dependencies:
 # - libcheck 0.9.10 is slightly too old, since 0.9.12 adds TAP support
@@ -39,13 +45,13 @@ before_script:
         - ./configure CFLAGS="$CFLAGS -fsanitize=address -Werror" --prefix=/usr --with-fallback-capaths=$TRAVIS_BUILD_DIR/swupd_test_certificates --with-systemdsystemunitdir=/usr/lib/systemd/system
         - make compliant
         - make shellcheck
+        - bats test/functional/generate-cert.prereq
 
 # Ubuntu's default umask is 0002, but this break's swupd hash calculations.
 script:
         - sudo find test/functional -exec chmod g-w {} \;
         - make &&
-          make check &&
           sudo sh -c 'umask 0022 && make install' &&
-          sudo sh -c 'umask 0022 && make install-check'
-
-after_failure: cat test-suite.log
+          sudo sh -c 'umask 0022 && make install-check' &&
+          sudo sh -c 'umask 0022 && make unit-check' &&
+          bats test/functional/"$FUNCTIONAL_TESTS"
