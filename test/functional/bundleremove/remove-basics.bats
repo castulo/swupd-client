@@ -68,7 +68,7 @@ global_teardown() {
 
 	run sudo sh -c "$SWUPD bundle-remove $SWUPD_OPTS test-bundle1 test-bundle2"
 
-	assert_status_is 0
+	assert_status_is_not 0
 	# bundle1 and 2 were removed
 	assert_file_not_exists "$TARGETDIR"/usr/share/clear/bundles/test-bundle1
 	assert_file_not_exists "$TARGETDIR"/usr/share/clear/bundles/test-bundle2
