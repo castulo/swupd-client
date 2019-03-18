@@ -39,8 +39,8 @@ before_script:
 # Ubuntu's default umask is 0002, but this break's swupd hash calculations.
 script:
         - sudo find test/functional -exec chmod g-w {} \;
-        - make -j48 &&
-          sudo sh -c 'umask 0022 && make -j48 check' &&
+        - make &&
+          sudo sh -c 'make check' &&
           sudo sh -c 'umask 0022 && make install' &&
           sudo sh -c 'umask 0022 && make install-check'
 
