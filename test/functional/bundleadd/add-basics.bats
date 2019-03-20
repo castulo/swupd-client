@@ -41,7 +41,7 @@ global_teardown() {
 @test "ADD001: Adding one bundle" {
 
 	run sudo sh -c "$SWUPD bundle-add $SWUPD_OPTS test-bundle1"
-	assert_status_is 0
+	assert_status_is 1
 	expected_output=$(cat <<-EOM
 		Starting download of remaining update content. This may take a while...
 		.
@@ -89,7 +89,7 @@ global_teardown() {
 	assert_status_is 0
 	expected_output=$(cat <<-EOM
 		Warning: Bundle "test-bundle3" is already installed, skipping it...
-		1 bundle was already installed
+		1 bundle was not already installed
 	EOM
 	)
 	assert_is_output --identical "$expected_output"
