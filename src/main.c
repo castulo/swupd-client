@@ -174,6 +174,11 @@ int main(int argc, char **argv)
 	int index;
 	int ret;
 
+	/* load configuration values from the config file if it exists*/
+	if (!config_parse("test.conf", load_config_value)) {
+		return SWUPD_INVALID_OPTION;
+	}
+
 	/* Set locale to system locale
 	 * Change from the standard (C) to system locale, so libarchive can
 	 * handle filename conversions.

@@ -36,6 +36,8 @@ swupd_SOURCES = \
 	src/alias.h \
 	src/lib/archives.c \
 	src/lib/archives.h \
+	src/lib/config_parser.c \
+	src/lib/config_parser.h \
 	src/autoupdate.c \
 	src/binary_loader.c \
 	src/bundle.c \
@@ -44,6 +46,7 @@ swupd_SOURCES = \
 	src/clr_bundle_add.c \
 	src/clr_bundle_ls.c \
 	src/clr_bundle_rm.c \
+	src/config_loader.c \
 	src/curl.c \
 	src/curl_async.c \
 	src/delta.c \

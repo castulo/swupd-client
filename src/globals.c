@@ -673,6 +673,11 @@ static bool global_parse_opt(int opt, char *optarg)
 	return false;
 }
 
+bool load_global_config_value(int opt, char *optarg)
+{
+	return global_parse_opt(opt, optarg);
+}
+
 static bool global_parse_deprecated(int opt, char *optarg)
 {
 	switch (opt) {

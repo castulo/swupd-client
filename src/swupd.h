@@ -11,6 +11,7 @@
 #include <string.h>
 
 #include "lib/archives.h"
+#include "lib/config_parser.h"
 #include "lib/formatter_json.h"
 #include "lib/list.h"
 #include "lib/log.h"
@@ -404,6 +405,9 @@ extern void print_update_conf_info(void);
 extern void handle_mirror_if_stale(void);
 
 extern enum swupd_code clean_statedir(bool all, bool dry_run);
+
+extern bool load_config_value(char *section, char *key, char *value);
+extern bool load_global_config_value(int opt, char *optarg);
 
 /* Parameter parsing in global.c */
 extern struct global_const global;
