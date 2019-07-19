@@ -38,12 +38,23 @@ static void log_internal(FILE *out, const char *file, int line, const char *labe
 	struct tm *timeinfo;
 	int printed;
 
-	/* if the message starts with '\n' add a line break before the message */
+	/* if the message starts with '\n' print a line break before the message
+	 * unless printing to a file
+	 * if the message starts with '\r' print the carriage return only if not in
+	 * debug mode or to a file because that would mess up the output */
 	while (strncmp(format, "\n", 1) == 0 || strncmp(format, "\r", 1) == 0) {
 		if (out == stdout || out == stderr) {
-			fprintf(out, "%c", format[0]);
+			if (strncmp(format, "\n", 1) == 0 || cur_log_level != LOG_DEBUG) {
+				fprintf(out, "%c", format[0]);
+			}
 		}
 		format++;
+	}
+
+	/* if the message was empty or had only line breaks or carriage return
+	 * finish here, otherwise we could print empty debug info or labels */
+	if (strcmp(format, "") == 0) {
+		return;
 	}
 
 	// In debug mode, print more information
@@ -63,7 +74,13 @@ static void log_internal(FILE *out, const char *file, int line, const char *labe
 		fprintf(out, "%s: ", label);
 	}
 	vfprintf(out, format, args_list);
-	fflush(out);
+
+	/* all debug messages need to finish with a line break, even if the
+	 * user didn't add one to the message, otherwise the output will be
+	 * messed up */
+	if ((cur_log_level == LOG_DEBUG) && (format[strlen(format) - 1] != '\n')) {
+		fprintf(out, "\n");
+	}
 }
 
 void log_set_level(int log_level)
