@@ -39,11 +39,14 @@
 /* TODO: update MAX_XFER after bug #562 is fixed.
  *
  * MAX XFER is the number of simultaneous downloads to be performed at the same
- * time. This value is set to 1 because of a bug that causes a dowload problem
+ * time. This value is set to 1 because of a bug that causes a download problem
  * when extrating a large file while other is being downloaded. Set this value
  * to a larger number, to be defined by tests, after bug is fixed.
 */
 #define MAX_XFER 1
+
+static struct list *missing_packs = NULL;
+static int count = 0;
 
 struct pack_data {
 	char *url;
@@ -89,13 +92,22 @@ static void download_free_data(void *data)
 static bool download_error(enum download_status status, void *data)
 {
 	struct pack_data *pack_data = data;
+	char *url;
 
 	if (!data) {
 		return false;
 	}
 
 	if (status == DOWNLOAD_STATUS_NOT_FOUND) {
-		telemetry(TELEMETRY_WARN, "packmissing", "url=%s\n", pack_data->url);
+		// instead of sending the record here to telemetry we can add it to
+		// a list so we can send a few missing packs in the same record to
+		// reduce the number of records (sometimes we have over a hundred for
+		// a single update)
+		//telemetry(TELEMETRY_WARN, "packmissing", "%s", missing_packs_str);
+		count++;
+		debug("Missing pack: %s\n", pack_data->url);
+		string_or_die(&url, "url=%s\n", pack_data->url);
+		missing_packs = list_prepend_data(missing_packs, url);
 		return true;
 	}
 
@@ -210,6 +222,8 @@ int download_subscribed_packs(struct list *subs, struct manifest *mom, bool requ
 	unsigned int complete = 0;
 	struct swupd_curl_parallel_handle *download_handle;
 	char *packs_size;
+	int ret;
+	char *missing_packs_str;
 
 	/* make a new list with only the bundles we actually need to download packs for */
 	for (iter = list_head(subs); iter; iter = iter->next) {
@@ -299,5 +313,37 @@ int download_subscribed_packs(struct list *subs, struct manifest *mom, bool requ
 	list_free_list(need_download);
 	info("Finishing packs extraction...\n");
 
-	return swupd_curl_parallel_download_end(download_handle, NULL);
+	ret = swupd_curl_parallel_download_end(download_handle, NULL);
+
+	/* report missing packs to telemetry */
+	if (missing_packs) {
+		// there is a lot of extra code here that is meant just to
+		// make it easier where the problem is, it will be removed
+		// once this is working
+		info("\n\nNumber of packs missing: %d\n", count);
+		info("\nMissing packs:\n");
+		struct list *iter;
+		for (iter = list_head(missing_packs); iter; iter = iter->next) {
+			char *pack = iter->data;
+			info("- %s", pack);
+		}
+		info("\n");
+		// here we can (and should) send missing packs in groups of 10?
+		// instead of just adding them all at once
+		missing_packs_str = string_join("", missing_packs);
+		info("Here is the list of missing packs:\n");
+		info("%s", missing_packs_str);
+		info("Length: %d\n", strlen(missing_packs_str));
+		// here we would send to telemetry
+		//telemetry(TELEMETRY_WARN, "packmissing", "%s", missing_packs_str);
+		free_string(&missing_packs_str);
+		// I tried freeing the list of missing_packs here, but that causes a
+		// memory leak for a reason I don't get:
+		// Direct leak of 253 byte(s) in 2 object(s) allocated from:
+		// in __interceptor_malloc ../../../../gcc-9.1.0/libsanitizer/asan/asan_malloc_linux.cc:144
+		// in __vasprintf_internal /usr/src/debug/glibc-2.29/libio/vasprintf.c:71
+		//list_free_list(missing_packs);
+	}
+
+	return ret;
 }
