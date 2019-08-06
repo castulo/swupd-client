@@ -602,27 +602,36 @@ int swupd_curl_parallel_download_end(struct swupd_curl_parallel_handle *h, int *
 		for (l = h->failed; l;) {
 			struct multi_curl_file *file = l->data;
 
-			if (file->retries < globals.max_retries &&
-			    file->status != DOWNLOAD_STATUS_WRITE_ERROR) {
+			if (file->retries < globals.max_retries) {
 				struct list *next;
 
-				file->retries++;
+				switch (file->status) {
+				case DOWNLOAD_STATUS_NOT_FOUND:
+				case DOWNLOAD_STATUS_WRITE_ERROR:
+				case DOWNLOAD_STATUS_FORBIDDEN:
+					/* if the download failed with any of these errors there is no point
+					 * in retrying the download */
+					l = l->next;
+					continue;
+				default:
+					file->retries++;
 
-				//Remove item
-				if (l == h->failed) {
-					h->failed = l->next;
-				}
-				next = l->next;
-				list_free_item(l, NULL);
-				l = next;
+					//Remove item
+					if (l == h->failed) {
+						h->failed = l->next;
+					}
+					next = l->next;
+					list_free_item(l, NULL);
+					l = next;
 
-				// Retry was probably scheduled because of network problems, so
-				// reevaluate the number of parallel downloads
-				reevaluate_number_of_parallel_downloads(h, file->retries);
-				info("Curl - Starting download retry #%d for %s\n", file->retries, file->url);
-				process_download(h, file);
-				retry = true;
-				continue;
+					// Retry was probably scheduled because of network problems, so
+					// reevaluate the number of parallel downloads
+					reevaluate_number_of_parallel_downloads(h, file->retries);
+					info("Curl - Starting download retry #%d for %s\n", file->retries, file->url);
+					process_download(h, file);
+					retry = true;
+					continue;
+			    }
 			}
 			l = l->next;
 		}
