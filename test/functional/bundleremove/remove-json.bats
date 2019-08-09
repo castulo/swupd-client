@@ -26,7 +26,7 @@ test_setup() {
 		{ "type" : "start", "section" : "bundle-remove" },
 		{ "type" : "info", "msg" : "Deleting bundle files... " },
 		{ "type" : "info", "msg" : "Total deleted files: 2 " },
-		{ "type" : "info", "msg" : "Successfully removed 1 bundle " },
+		{ "type" : "info", "msg" : " Successfully removed 1 bundle " },
 		{ "type" : "end", "section" : "bundle-remove", "status" : 0 }
 		]
 	EOM

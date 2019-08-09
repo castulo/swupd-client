@@ -37,6 +37,9 @@
 #include "swupd.h"
 
 #define MODE_RW_O (S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)
+#define TREE_ON true
+#define TREE_OFF false
+#define MAX_TREE 100
 
 /*
 * list_installable_bundles()
@@ -160,9 +163,10 @@ static enum swupd_code unload_tracked_bundle(const char *bundle_name, struct lis
 }
 
 /* Return list of bundles that include bundle_name */
-static void required_by(struct list **reqd_by, const char *bundle_name, struct manifest *mom, int recursion)
+static void required_by(struct list **reqd_by, const char *bundle_name, struct manifest *mom, int recursion, bool tree_view)
 {
 	struct list *b, *i;
+
 	// track recursion level for indentation
 	recursion++;
 
@@ -179,15 +183,18 @@ static void required_by(struct list **reqd_by, const char *bundle_name, struct m
 
 			if (strcmp(name, bundle_name) == 0) {
 				char *bundle_str = NULL;
+
 				indent = (recursion - 1) * 4;
-				if (recursion == 1) {
+				if (!tree_view) {
+					string_or_die(&bundle_str, "%s\n", bundle->component);
+				} else if (recursion == 1) {
 					string_or_die(&bundle_str, "%*s* %s\n", indent + 2, "", bundle->component);
 				} else {
 					string_or_die(&bundle_str, "%*s|-- %s\n", indent, "", bundle->component);
 				}
 
 				*reqd_by = list_append_data(*reqd_by, bundle_str);
-				required_by(reqd_by, bundle->component, mom, recursion);
+				required_by(reqd_by, bundle->component, mom, recursion, tree_view);
 			}
 		}
 	}
@@ -348,7 +355,7 @@ enum swupd_code show_bundle_reqd_by(const char *bundle_name, bool server)
 		goto out;
 	}
 
-	required_by(&reqd_by, bundle_name, current_manifest, 0);
+	required_by(&reqd_by, bundle_name, current_manifest, 0, TREE_ON);
 	if (reqd_by == NULL) {
 		info("No bundles have %s as a dependency\n", bundle_name);
 		ret = SWUPD_OK;
@@ -561,7 +568,7 @@ enum swupd_code remove_bundles(char **bundles)
 
 		/* only show this message if there are multiple bundles to be removed */
 		if (*(bundles + 1) || total > 0) {
-			info("Removing bundle: %s\n", bundle);
+			info("\nRemoving bundle: %s\n", bundle);
 		}
 
 		current_mom = load_mom(current_version, false, mix_exists, NULL);
@@ -601,26 +608,47 @@ enum swupd_code remove_bundles(char **bundles)
 		}
 
 		/* check if bundle is required by another installed bundle */
-		struct list *reqd_by = NULL;
-		required_by(&reqd_by, bundle, current_mom, 0);
-		if (reqd_by != NULL) {
+		struct list *tree_reqd_by = NULL;
+		struct list *simple_reqd_by = NULL;
+
+		required_by(&simple_reqd_by, bundle, current_mom, 0, TREE_OFF);
+		if (simple_reqd_by != NULL) {
+			list_str_deduplicate(simple_reqd_by);
+			int number_of_reqd = list_len(simple_reqd_by);
+			/* let's try to build a dependency tree */
+			required_by(&tree_reqd_by, bundle, current_mom, 0, TREE_ON);
+			int number_of_tree_reqd = list_len(tree_reqd_by);
+
 			struct list *iter;
-			char *bundle;
-			iter = list_head(reqd_by);
-			error("bundle requested to be removed is required by the following bundles:\n");
-			info("format:\n");
-			info(" # * is-required-by\n");
-			info(" #   |-- is-required-by\n");
-			info(" # * is-also-required-by\n # ...\n\n");
-			while (iter) {
-				bundle = iter->data;
-				iter = iter->next;
-				info("%s", bundle);
+			char *dep;
+			/* if the tree view is not too big we can display that in a nicer way,
+			 * if it exceeds the threshold, we will use the simplified list */
+			error("\n%s is required by the following bundles:\n", bundle);
+			if (number_of_tree_reqd > MAX_TREE) {
+				iter = list_head(simple_reqd_by);
+				while (iter) {
+					dep = iter->data;
+					iter = iter->next;
+					info(" - %s", dep);
+				}
+			} else {
+				iter = list_head(tree_reqd_by);
+				info("format:\n");
+				info(" # * is-required-by\n");
+				info(" #   |-- is-required-by\n");
+				info(" # * is-also-required-by\n # ...\n\n");
+				while (iter) {
+					dep = iter->data;
+					iter = iter->next;
+					info("%s", dep);
+				}
 			}
 
-			list_free_list_and_data(reqd_by, free);
+			list_free_list_and_data(tree_reqd_by, free);
+			list_free_list_and_data(simple_reqd_by, free);
 			ret = SWUPD_REQUIRED_BUNDLE_ERROR;
 			bad++;
+			info("\nThe %s bundle is required by %d bundles\n", bundle, number_of_reqd);
 			goto out_free_mom;
 		}
 
@@ -664,9 +692,9 @@ enum swupd_code remove_bundles(char **bundles)
 	}
 
 	if (bad > 0) {
-		print("Failed to remove %i of %i bundles\n", bad, total);
+		print("\nFailed to remove %i of %i bundles\n", bad, total);
 	} else {
-		print("Successfully removed %i bundle%s\n", total, (total > 1 ? "s" : ""));
+		print("\nSuccessfully removed %i bundle%s\n", total, (total > 1 ? "s" : ""));
 	}
 
 	free_subscriptions(&subs);

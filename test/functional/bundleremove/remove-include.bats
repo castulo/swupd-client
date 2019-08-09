@@ -22,13 +22,14 @@ test_setup() {
 	assert_file_exists "$TARGETDIR"/foo/test-file1
 	assert_file_exists "$TARGETDIR"/bar/test-file2
 	expected_output=$(cat <<-EOM
-		Error: bundle requested to be removed is required by the following bundles:
+		Error: test-bundle1 is required by the following bundles:
 		format:
 		 # * is-required-by
 		 #   |-- is-required-by
 		 # * is-also-required-by
 		 # ...
 		  * test-bundle2
+		The test-bundle1 bundle is required by 1 bundles
 		Failed to remove 1 of 1 bundles
 	EOM
 	)

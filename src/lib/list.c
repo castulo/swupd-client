@@ -318,3 +318,28 @@ int list_strcmp(const void *a, const void *b)
 {
 	return strcmp((const char *)a, (const char *)b);
 }
+
+void list_str_deduplicate(struct list *strs)
+{
+	struct list *list, *next;
+	char *str1, *str2;
+
+	strs = list_sort(strs, list_strcmp);
+
+	list = list_head(strs);
+	while (list) {
+		next = list->next;
+		if (next == NULL) {
+			break;
+		}
+		str1 = list->data;
+		str2 = next->data;
+		/* If the filenames are different, nothing to do, just move on */
+		if (strcmp(str1, str2)) {
+			list = next;
+			continue;
+		}
+		list_free_item(next, free);
+		continue;
+	}
+}
