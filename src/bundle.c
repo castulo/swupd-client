@@ -566,11 +566,6 @@ enum swupd_code remove_bundles(char **bundles)
 			goto out_free_curl;
 		}
 
-		/* only show this message if there are multiple bundles to be removed */
-		if (*(bundles + 1) || total > 0) {
-			info("\nRemoving bundle: %s\n", bundle);
-		}
-
 		current_mom = load_mom(current_version, false, mix_exists, NULL);
 		if (!current_mom) {
 			error("Unable to download/verify %d Manifest.MoM\n", current_version);
@@ -578,6 +573,8 @@ enum swupd_code remove_bundles(char **bundles)
 			bad++;
 			goto out_free_curl;
 		}
+
+		info("\nRemoving bundle: %s\n", bundle);
 
 		if (!search_bundle_in_manifest(current_mom, bundle)) {
 			error("Bundle name is invalid, aborting removal\n");
