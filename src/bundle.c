@@ -175,6 +175,12 @@ static void required_by(struct list **reqd_by, const char *bundle_name, struct m
 		struct manifest *bundle = b->data;
 		b = b->next;
 
+		if (strcmp(bundle->component, bundle_name) == 0) {
+			/* circular dependencies are not allowed in manifests,
+			 * so we can skip checking for dependencies in the same bundle */
+			continue;
+		}
+
 		int indent = 0;
 		i = list_head(bundle->includes);
 		while (i) {
@@ -339,12 +345,6 @@ enum swupd_code show_bundle_reqd_by(const char *bundle_name, bool server)
 	} else {
 		/* load all tracked bundles into memory */
 		read_subscriptions(&subs);
-		/* now popout the one to be processed */
-		ret = unload_tracked_bundle(bundle_name, &subs);
-		if (ret != 0) {
-			error("Unable to untrack %s\n", bundle_name);
-			goto out;
-		}
 	}
 
 	/* load all submanifests */
@@ -585,17 +585,9 @@ enum swupd_code remove_bundles(char **bundles)
 
 		/* load all tracked bundles into memory */
 		read_subscriptions(&subs);
-
-		/* popout the bundle to be removed from memory */
-		ret = unload_tracked_bundle(bundle, &subs);
-		if (ret != 0) {
-			bad++;
-			goto out_free_mom;
-		}
-
 		set_subscription_versions(current_mom, NULL, &subs);
 
-		/* load all submanifests minus the one to be removed */
+		/* load all submanifests */
 		current_mom->submanifests = recurse_manifest(current_mom, subs, NULL, false, NULL);
 		if (!current_mom->submanifests) {
 			error("Cannot load MoM sub-manifests\n");
