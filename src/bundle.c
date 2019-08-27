@@ -80,42 +80,6 @@ enum swupd_code list_installable_bundles()
 	return 0;
 }
 
-/* bundle_name: this is the name for the bundle we want to be loaded
-* version: this is the MoM version from which we pull last changed for bundle manifest
-* submanifest: where bundle manifest is going to be loaded
-*
-* Basically we read MoM version then get the submanifest only for our bundle (component)
-* put it into submanifest pointer, then dispose MoM data.
-*/
-static int load_bundle_manifest(const char *bundle_name, struct list *subs, int version, struct manifest **submanifest)
-{
-	struct list *sub_list = NULL;
-	struct manifest *mom = NULL;
-	int ret = 0;
-
-	*submanifest = NULL;
-
-	mom = load_mom(version, false, false, NULL);
-	if (!mom) {
-		return SWUPD_COULDNT_LOAD_MOM;
-	}
-
-	sub_list = recurse_manifest(mom, subs, bundle_name, false, NULL);
-	if (!sub_list) {
-		ret = SWUPD_RECURSE_MANIFEST;
-		goto free_out;
-	}
-
-	*submanifest = sub_list->data;
-	sub_list->data = NULL;
-	ret = 0;
-
-free_out:
-	list_free_list(sub_list);
-	free_manifest(mom);
-	return ret;
-}
-
 /* Finds out whether bundle_name is installed bundle on
 *  current system.
 */
@@ -135,26 +99,22 @@ bool is_installed_bundle(const char *bundle_name)
 	return ret;
 }
 
-/* When loading all tracked bundles into memory, they happen
- * to be hold in subs global var, for some reasons it is
- * needed to just pop out one or more of this loaded tracked
- * bundles, this function search for bundle_name into subs
- * struct and if it found then free it from the list.
- */
-static enum swupd_code unload_tracked_bundle(const char *bundle_name, struct list **subs)
+static enum swupd_code unload_manifest(const char *bundle_name, struct list **bundles_installed, struct list **bundles_to_remove)
 {
-	struct list *bundles;
+	struct list *manifests;
 	struct list *cur_item;
-	struct sub *bundle;
+	struct manifest *manifest;
 
-	bundles = list_head(*subs);
-	while (bundles) {
-		bundle = bundles->data;
-		cur_item = bundles;
-		bundles = bundles->next;
-		if (strcmp(bundle->component, bundle_name) == 0) {
-			/* unlink (aka untrack) matching bundle name from tracked ones */
-			*subs = free_bundle(cur_item);
+	manifests = list_head(*bundles_installed);
+	while (manifests) {
+		manifest = manifests->data;
+		cur_item = manifests;
+		manifests = manifests->next;
+
+		if (strcmp(manifest->component, bundle_name) == 0) {
+			/* moves the manifest from one list to the other */
+			*bundles_to_remove = list_prepend_data(*bundles_to_remove, manifest);
+			*bundles_installed = list_free_item(cur_item, NULL);
 			return SWUPD_OK;
 		}
 	}
@@ -487,7 +447,7 @@ out:
 
 /*  This function is a fresh new implementation for a bundle
  *  remove without being tied to verify loop, this means
- *  improved speed and space as well as more roubustness and
+ *  improved speed and space as well as more robustness and
  *  flexibility. The function removes one or more bundles
  *  passed in the bundles param.
  *
@@ -511,8 +471,10 @@ enum swupd_code remove_bundles(char **bundles)
 	int bad = 0;
 	int total = 0;
 	int current_version = CURRENT_OS_VERSION;
-	struct manifest *current_mom, *bundle_manifest = NULL;
+	struct manifest *current_mom = NULL;
 	struct list *subs = NULL;
+	struct list *bundles_to_remove = NULL;
+	struct list *files_to_remove = NULL;
 	bool mix_exists;
 
 	ret = swupd_init(SWUPD_ALL);
@@ -524,24 +486,30 @@ enum swupd_code remove_bundles(char **bundles)
 	current_version = get_current_version(globals.path_prefix);
 	if (current_version < 0) {
 		error("Unable to determine current OS version\n");
-		ret = SWUPD_CURRENT_VERSION_UNKNOWN;
-		telemetry(TELEMETRY_CRIT,
-			  "bundleremove",
-			  "bundle=%s\n"
-			  "current_version=%d\n"
-			  "result=%d\n"
-			  "bytes=%ld\n",
-			  *bundles,
-			  current_version,
-			  ret,
-			  total_curl_sz);
-
-		free_subscriptions(&subs);
-		swupd_deinit();
-		return ret;
+		ret_code = SWUPD_CURRENT_VERSION_UNKNOWN;
+		goto out_deinit;
 	}
 
 	mix_exists = (check_mix_exists() & system_on_mix());
+
+	current_mom = load_mom(current_version, false, mix_exists, NULL);
+	if (!current_mom) {
+		error("Unable to download/verify %d Manifest.MoM\n", current_version);
+		ret_code = SWUPD_COULDNT_LOAD_MOM;
+		goto out_deinit;
+	}
+
+	/* load all tracked bundles into memory */
+	read_subscriptions(&subs);
+	set_subscription_versions(current_mom, NULL, &subs);
+
+	/* load all submanifests */
+	current_mom->submanifests = recurse_manifest(current_mom, subs, NULL, false, NULL);
+	if (!current_mom->submanifests) {
+		error("Cannot load MoM sub-manifests\n");
+		ret_code = SWUPD_RECURSE_MANIFEST;
+		goto out_subs;
+	}
 
 	for (; *bundles; ++bundles, total++) {
 
@@ -553,47 +521,24 @@ enum swupd_code remove_bundles(char **bundles)
 		* anyways, better catch here and return success, no extra work to be done.
 		*/
 		if (strcmp(bundle, "os-core") == 0) {
-			warn("Bundle \"os-core\" not allowed to be removed\n");
+			warn("\nBundle \"os-core\" not allowed to be removed, skipping it...\n");
 			ret = SWUPD_REQUIRED_BUNDLE_ERROR;
 			bad++;
-			goto out_free_curl;
+			goto report_to_telemetry;
 		}
 
 		if (!is_installed_bundle(bundle)) {
-			warn("Bundle \"%s\" is not installed, skipping it...\n", bundle);
+			warn("\nBundle \"%s\" is not installed, skipping it...\n", bundle);
 			ret = SWUPD_BUNDLE_NOT_TRACKED;
 			bad++;
-			goto out_free_curl;
+			goto report_to_telemetry;
 		}
-
-		current_mom = load_mom(current_version, false, mix_exists, NULL);
-		if (!current_mom) {
-			error("Unable to download/verify %d Manifest.MoM\n", current_version);
-			ret = SWUPD_COULDNT_LOAD_MOM;
-			bad++;
-			goto out_free_curl;
-		}
-
-		info("\nRemoving bundle: %s\n", bundle);
 
 		if (!search_bundle_in_manifest(current_mom, bundle)) {
-			error("Bundle name is invalid, aborting removal\n");
+			error("\nBundle name is invalid, skipping it...\n");
 			ret = SWUPD_INVALID_BUNDLE;
 			bad++;
-			goto out_free_mom;
-		}
-
-		/* load all tracked bundles into memory */
-		read_subscriptions(&subs);
-		set_subscription_versions(current_mom, NULL, &subs);
-
-		/* load all submanifests */
-		current_mom->submanifests = recurse_manifest(current_mom, subs, NULL, false, NULL);
-		if (!current_mom->submanifests) {
-			error("Cannot load MoM sub-manifests\n");
-			ret = SWUPD_RECURSE_MANIFEST;
-			bad++;
-			goto out_free_mom;
+			goto report_to_telemetry;
 		}
 
 		/* check if bundle is required by another installed bundle */
@@ -637,33 +582,17 @@ enum swupd_code remove_bundles(char **bundles)
 			list_free_list_and_data(simple_reqd_by, free);
 			ret = SWUPD_REQUIRED_BUNDLE_ERROR;
 			bad++;
-			info("\nThe %s bundle is required by %d bundles\n", bundle, number_of_reqd);
-			goto out_free_mom;
+			info("\nThe %s bundle is required by %d bundles, skipping it...\n", bundle, number_of_reqd);
+			goto report_to_telemetry;
 		}
 
-		current_mom->files = files_from_bundles(current_mom->submanifests);
-		current_mom->files = consolidate_files(current_mom->files);
+		/* move the manifest of the bundle to be removed from the list of subscribed bundles
+		 * to the list of bundles to be removed */
+		unload_manifest(bundle, &current_mom->submanifests, &bundles_to_remove);
+		info("Removing bundle: %s\n", bundle);
+		remove_tracked(bundle);
 
-		/* Now that we have the consolidated list of all files, load bundle to be removed submanifest */
-		ret = load_bundle_manifest(bundle, subs, current_version, &bundle_manifest);
-		if (ret != 0 || !bundle_manifest) {
-			error("Cannot load %s sub-manifest (ret = %d)\n", bundle, ret);
-			bad++;
-			goto out_free_mom;
-		}
-
-		/* deduplication needs file list sorted by filename, do so */
-		bundle_manifest->files = list_sort(bundle_manifest->files, file_sort_filename);
-		deduplicate_files_from_manifest(&bundle_manifest, current_mom);
-
-		info("Deleting bundle files...\n");
-		remove_files_in_manifest_from_fs(bundle_manifest);
-		remove_tracked(bundle_manifest->component);
-
-		free_manifest(bundle_manifest);
-	out_free_mom:
-		free_manifest(current_mom);
-	out_free_curl:
+	report_to_telemetry:
 		telemetry(ret ? TELEMETRY_CRIT : TELEMETRY_INFO,
 			  "bundleremove",
 			  "bundle=%s\n"
@@ -680,14 +609,53 @@ enum swupd_code remove_bundles(char **bundles)
 		}
 	}
 
+	/* get the list of all files required by the installed bundles (except the ones to be removed) */
+	current_mom->files = files_from_bundles(current_mom->submanifests);
+	current_mom->files = consolidate_files(current_mom->files);
+
+	/* get the list of the files contained in the bundles to be removed */
+	files_to_remove = files_from_bundles(bundles_to_remove);
+	files_to_remove = consolidate_files(files_to_remove);
+
+	/* sanitize files to remove; if a file is needed by a bundle that
+	 * is installed, it should be kept in the system */
+	deduplicate_files(&files_to_remove, current_mom->files);
+
+	if (list_len(files_to_remove) > 0) {
+		info("\nDeleting bundle files...\n");
+		progress_set_step(1, "remove_files");
+		remove_files_from_fs(files_to_remove);
+	}
+
 	if (bad > 0) {
 		print("\nFailed to remove %i of %i bundles\n", bad, total);
 	} else {
 		print("\nSuccessfully removed %i bundle%s\n", total, (total > 1 ? "s" : ""));
 	}
 
+	list_free_list(files_to_remove);
+	list_free_list_and_data(bundles_to_remove, free_manifest_data);
+	free_manifest(current_mom);
 	free_subscriptions(&subs);
 	swupd_deinit();
+
+	return ret_code;
+
+out_subs:
+	free_subscriptions(&subs);
+out_deinit:
+	telemetry(TELEMETRY_CRIT,
+		  "bundleremove",
+		  "bundle=%s\n"
+		  "current_version=%d\n"
+		  "result=%d\n"
+		  "bytes=%ld\n",
+		  *bundles,
+		  current_version,
+		  ret_code,
+		  total_curl_sz);
+	swupd_deinit();
+	print("\nFailed to remove bundle(s)\n");
 
 	return ret_code;
 }

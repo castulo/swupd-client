@@ -269,8 +269,6 @@ extern bool verify_file_lazy(char *filename);
 extern int verify_bundle_hash(struct manifest *manifest, struct file *bundle);
 extern int rm_staging_dir_contents(const char *rel_path);
 void free_file_data(void *data);
-void remove_files_in_manifest_from_fs(struct manifest *m);
-void deduplicate_files_from_manifest(struct manifest **m1, struct manifest *m2);
 extern struct file *search_bundle_in_manifest(struct manifest *manifest, const char *bundlename);
 extern struct file *search_file_in_manifest(struct manifest *manifest, const char *filename);
 
@@ -310,6 +308,8 @@ extern bool is_url_insecure(const char *url);
 extern void remove_trailing_slash(char *url);
 extern int link_or_copy(const char *orig, const char *dest);
 extern int link_or_copy_all(const char *orig, const char *dest);
+extern void remove_files_from_fs(struct list *files);
+extern void deduplicate_files(struct list **files1, struct list *files2);
 
 /* subscription.c */
 struct list *free_list_file(struct list *item);

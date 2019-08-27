@@ -34,7 +34,7 @@ test_setup() {
 		 # ...
 		  * test-bundle2
 		    |-- test-bundle3
-		The test-bundle1 bundle is required by 2 bundles
+		The test-bundle1 bundle is required by 2 bundles, skipping it...
 		Failed to remove 1 of 1 bundles
 	EOM
 	)

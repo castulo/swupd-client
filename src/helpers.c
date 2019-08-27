@@ -1170,3 +1170,87 @@ bool check_mix_exists(void)
 	free_string(&fullpath);
 	return ret;
 }
+
+/* Iterate the file list and remove from the file system each file/directory */
+void remove_files_from_fs(struct list *files)
+{
+	struct list *iter = NULL;
+	struct file *file = NULL;
+	char *fullfile = NULL;
+	int total = list_len(files);
+	int deleted = total;
+	int count = 0;
+
+	iter = list_head(files);
+	while (iter) {
+		file = iter->data;
+		iter = iter->next;
+		string_or_die(&fullfile, "%s/%s", globals.path_prefix, file->filename);
+		if (swupd_rm(fullfile) == -1) {
+			/* if a -1 is returned it means there was an issue deleting the
+			 * file or directory, in that case decrease the counter of deleted
+			 * files.
+			 * Note: If a file didn't exist it will still be counted as deleted,
+			 * this is a limitation */
+			deleted--;
+		}
+		free_string(&fullfile);
+		count++;
+		progress_report(count, total);
+	}
+	info("Total deleted files: %i\n", deleted);
+}
+
+/*
+ * free all files found in files1 that happens to be duplicated on files2
+ *
+ * Is _mandatory_ to have both files lists ordered by filename before calling
+ * this function
+ *
+ * This function removes all duplicated files matching those in files2 from
+ * files1, but it doesn't free the data.
+ *
+ */
+void deduplicate_files(struct list **files1, struct list *files2)
+{
+	struct list *iter1, *iter2, *cur_file, *preserver = NULL;
+	struct file *file1, *file2 = NULL;
+	int ret;
+	int count = 0;
+
+	iter1 = preserver = list_head(*files1);
+	iter2 = list_head(files2);
+
+	while (iter1 && iter2) {
+		file1 = iter1->data;
+		file2 = iter2->data;
+		cur_file = iter1;
+
+		ret = strcmp(file1->filename, file2->filename);
+		if (ret == 0) {
+			/* file required by installed bundles */
+			iter1 = iter1->next;
+			iter2 = iter2->next;
+
+			if (!file1->is_deleted && file2->is_deleted) {
+				/* file is deleted initially and hence keep in list to remove */
+				continue;
+			}
+			preserver = list_free_item(cur_file, NULL);
+			count++;
+		} else if (ret < 0) {
+			/* file not required by installed bundles */
+			iter1 = iter1->next;
+			if (file1->is_deleted) {
+				/* file already deleted, pull it out of the list */
+				preserver = list_free_item(cur_file, NULL);
+				count++;
+			}
+		} else {
+			iter2 = iter2->next;
+		}
+	}
+
+	/* give me back my list pointer */
+	*files1 = preserver;
+}

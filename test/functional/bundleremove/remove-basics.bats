@@ -55,13 +55,13 @@ global_teardown() {
 	assert_file_exists "$TARGETDIR"/bat/common
 	assert_file_exists "$STATEDIR"/bundles/test-bundle2
 	expected_output=$(cat <<-EOM
+		Removing bundle: test-bundle1
 		Deleting bundle files...
 		Total deleted files: 6
-
 		Successfully removed 1 bundle
 	EOM
 	)
-	assert_is_output --identical "$expected_output"
+	assert_is_output "$expected_output"
 
 }
 
@@ -84,19 +84,14 @@ global_teardown() {
 	assert_file_not_exists "$STATEDIR"/bundles/test-bundle1
 	assert_file_not_exists "$STATEDIR"/bundles/test-bundle2
 	expected_output=$(cat <<-EOM
-
 		Removing bundle: test-bundle1
-		Deleting bundle files...
-		Total deleted files: 6
-
 		Removing bundle: test-bundle2
 		Deleting bundle files...
-		Total deleted files: 4
-
+		Total deleted files: 9
 		Successfully removed 2 bundles
 	EOM
 	)
-	assert_is_output --identical "$expected_output"
+	assert_is_output "$expected_output"
 
 }
 
@@ -110,6 +105,7 @@ global_teardown() {
 
 	assert_status_is "$SWUPD_BUNDLE_NOT_TRACKED"
 	expected_output=$(cat <<-EOM
+
 		Warning: Bundle "test-bundle3" is not installed, skipping it...
 
 		Failed to remove 1 of 1 bundles
@@ -125,6 +121,7 @@ global_teardown() {
 
 	assert_status_is "$SWUPD_BUNDLE_NOT_TRACKED"
 	expected_output=$(cat <<-EOM
+
 		Warning: Bundle "fake-bundle" is not installed, skipping it...
 
 		Failed to remove 1 of 1 bundles
@@ -140,7 +137,9 @@ global_teardown() {
 
 	assert_status_is "$SWUPD_BUNDLE_NOT_TRACKED"
 	expected_output=$(cat <<-EOM
+
 		Warning: Bundle "fake-bundle" is not installed, skipping it...
+
 		Warning: Bundle "test-bundle3" is not installed, skipping it...
 
 		Failed to remove 2 of 2 bundles
@@ -171,15 +170,13 @@ global_teardown() {
 	assert_file_exists "$TARGETDIR"/bat/common
 	expected_output=$(cat <<-EOM
 		Warning: Bundle "test-bundle3" is not installed, skipping it...
-
 		Removing bundle: test-bundle1
 		Deleting bundle files...
 		Total deleted files: 6
-
 		Failed to remove 1 of 2 bundles
 	EOM
 	)
-	assert_is_output --identical "$expected_output"
+	assert_is_output "$expected_output"
 
 }
 
@@ -200,14 +197,12 @@ global_teardown() {
 	assert_file_exists "$TARGETDIR"/bat/common
 	expected_output=$(cat <<-EOM
 		Warning: Bundle "fake-bundle" is not installed, skipping it...
-
 		Removing bundle: test-bundle1
 		Deleting bundle files...
 		Total deleted files: 6
-
 		Failed to remove 1 of 2 bundles
 	EOM
 	)
-	assert_is_output --identical "$expected_output"
+	assert_is_output "$expected_output"
 
 }
