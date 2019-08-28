@@ -346,6 +346,9 @@ extern void verify_set_extra_files_only(bool opt);
 /* repair.c */
 extern regex_t *compile_whitelist(const char *whitelist_pattern);
 
+/* bundle-remove */
+extern void remove_set_option_force(bool opt);
+
 /* telemetry.c */
 typedef enum telem_prio_t {
 	TELEMETRY_DEBG = 1,

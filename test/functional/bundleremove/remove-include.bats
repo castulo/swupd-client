@@ -29,7 +29,8 @@ test_setup() {
 		 # * is-also-required-by
 		 # ...
 		  * test-bundle2
-		The test-bundle1 bundle is required by 1 bundles, skipping it...
+		Bundle 'test-bundle1' is required by 1 bundle, skipping it...
+		Use "swupd bundle-remove --force test-bundle1" to remove 'test-bundle1' and all bundles that require it
 		Failed to remove 1 of 1 bundles
 	EOM
 	)

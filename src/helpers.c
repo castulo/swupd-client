@@ -1216,7 +1216,6 @@ void deduplicate_files(struct list **files1, struct list *files2)
 	struct list *iter1, *iter2, *cur_file, *preserver = NULL;
 	struct file *file1, *file2 = NULL;
 	int ret;
-	int count = 0;
 
 	iter1 = preserver = list_head(*files1);
 	iter2 = list_head(files2);
@@ -1237,14 +1236,12 @@ void deduplicate_files(struct list **files1, struct list *files2)
 				continue;
 			}
 			preserver = list_free_item(cur_file, NULL);
-			count++;
 		} else if (ret < 0) {
 			/* file not required by installed bundles */
 			iter1 = iter1->next;
 			if (file1->is_deleted) {
 				/* file already deleted, pull it out of the list */
 				preserver = list_free_item(cur_file, NULL);
-				count++;
 			}
 		} else {
 			iter2 = iter2->next;

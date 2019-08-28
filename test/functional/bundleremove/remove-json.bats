@@ -24,7 +24,7 @@ test_setup() {
 	expected_output=$(cat <<-EOM
 		[
 		{ "type" : "start", "section" : "bundle-remove" },
-		{ "type" : "info", "msg" : "Removing bundle: test-bundle " },
+		{ "type" : "info", "msg" : " Removing bundle: test-bundle " },
 		{ "type" : "info", "msg" : " Deleting bundle files... " },
 		{ "type" : "progress", "currentStep" : 1, "totalSteps" : 1, "stepCompletion" : 50, "stepDescription" : "remove_files" },
 		{ "type" : "progress", "currentStep" : 1, "totalSteps" : 1, "stepCompletion" : 100, "stepDescription" : "remove_files" },

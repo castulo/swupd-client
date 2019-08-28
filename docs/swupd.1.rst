@@ -209,6 +209,10 @@ SUBCOMMANDS
     bundle(s) on the system, a tree will be displayed to indicate which bundles
     are blocking removal.
 
+    -  `-x, --force`
+
+        Removes a bundle along with all its dependent bundles.
+
 ``bundle-list``
 
     List all installed software bundles in the local system. Bundles available
