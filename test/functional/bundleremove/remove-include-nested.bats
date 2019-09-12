@@ -26,13 +26,13 @@ test_setup() {
 	assert_status_is "$SWUPD_REQUIRED_BUNDLE_ERROR"
 	expected_output=$(cat <<-EOM
 		Error: test-bundle1 is required by the following bundles:
+		  * test-bundle2
+		    |-- test-bundle3
 		format:
 		 # * is-required-by
 		 #   |-- is-required-by
 		 # * is-also-required-by
 		 # ...
-		  * test-bundle2
-		    |-- test-bundle3
 		Bundle 'test-bundle1' is required by 2 bundles, skipping it...
 		Use "swupd bundle-remove --force test-bundle1" to remove 'test-bundle1' and all bundles that require it
 		Failed to remove 1 of 1 bundles
@@ -98,5 +98,122 @@ test_setup() {
 	assert_file_exists "$TARGETDIR"/test-file4
 	assert_file_exists "$TARGETDIR"/test-file5
 	assert_file_exists "$TARGETDIR"/common
+
+}
+
+@test "REM023: Try removing multiple bundles that have a dependency of another bundle" {
+
+	# if the user provide multilple bundles in the command they all should
+	# be considered for the overall removal operation regardless of the
+	# order of the bundles
+
+	assert_file_exists "$TARGETDIR"/usr/share/clear/bundles/test-bundle1
+	assert_file_exists "$TARGETDIR"/usr/share/clear/bundles/test-bundle2
+	assert_file_exists "$TARGETDIR"/usr/share/clear/bundles/test-bundle3
+
+	run sudo sh -c "$SWUPD bundle-remove $SWUPD_OPTS test-bundle1 test-bundle2"
+
+	assert_status_is "$SWUPD_REQUIRED_BUNDLE_ERROR"
+	expected_output=$(cat <<-EOM
+		Error: test-bundle2 is required by the following bundles:
+		  * test-bundle3
+		format:
+		 # * is-required-by
+		 #   |-- is-required-by
+		 # * is-also-required-by
+		 # ...
+		Bundle 'test-bundle2' is required by 1 bundle, skipping it...
+		Use "swupd bundle-remove --force test-bundle2" to remove 'test-bundle2' and all bundles that require it
+		Failed to remove 2 of 2 bundles
+	EOM
+	)
+	assert_is_output "$expected_output"
+
+	assert_file_exists "$TARGETDIR"/usr/share/clear/bundles/test-bundle1
+	assert_file_exists "$TARGETDIR"/usr/share/clear/bundles/test-bundle2
+	assert_file_exists "$TARGETDIR"/usr/share/clear/bundles/test-bundle3
+
+	# re-try the test inverting the order of the bundles
+
+	run sudo sh -c "$SWUPD bundle-remove $SWUPD_OPTS test-bundle2 test-bundle1"
+
+	assert_status_is "$SWUPD_REQUIRED_BUNDLE_ERROR"
+	expected_output=$(cat <<-EOM
+		Error: test-bundle2 is required by the following bundles:
+		  * test-bundle3
+		format:
+		 # * is-required-by
+		 #   |-- is-required-by
+		 # * is-also-required-by
+		 # ...
+		Bundle 'test-bundle2' is required by 1 bundle, skipping it...
+		Use "swupd bundle-remove --force test-bundle2" to remove 'test-bundle2' and all bundles that require it
+		Failed to remove 2 of 2 bundles
+	EOM
+	)
+	assert_is_output "$expected_output"
+
+	assert_file_exists "$TARGETDIR"/usr/share/clear/bundles/test-bundle1
+	assert_file_exists "$TARGETDIR"/usr/share/clear/bundles/test-bundle2
+	assert_file_exists "$TARGETDIR"/usr/share/clear/bundles/test-bundle3
+
+}
+
+@test "REM024: Remove a bundle that is a nested dependency of other bundles by providing them as args" {
+
+	# if the user provide multilple bundles in the command they all should
+	# be considered for the overall removal operation regardless of the
+	# order of the bundles
+
+	assert_file_exists "$TARGETDIR"/usr/share/clear/bundles/test-bundle1
+	assert_file_exists "$TARGETDIR"/usr/share/clear/bundles/test-bundle2
+	assert_file_exists "$TARGETDIR"/usr/share/clear/bundles/test-bundle3
+
+	run sudo sh -c "$SWUPD bundle-remove $SWUPD_OPTS test-bundle2 test-bundle1 test-bundle3"
+
+	assert_status_is "$SWUPD_OK"
+	expected_output=$(cat <<-EOM
+		Removing bundle: test-bundle2
+		Removing bundle: test-bundle1
+		Removing bundle: test-bundle3
+		Deleting bundle files...
+		Total deleted files: 7
+		Successfully removed 3 bundles
+	EOM
+	)
+	assert_is_output "$expected_output"
+
+	assert_file_not_exists "$TARGETDIR"/usr/share/clear/bundles/test-bundle1
+	assert_file_not_exists "$TARGETDIR"/usr/share/clear/bundles/test-bundle2
+	assert_file_not_exists "$TARGETDIR"/usr/share/clear/bundles/test-bundle3
+
+	# reinstall the bundles
+	install_bundle "$WEBDIR"/10/Manifest.test-bundle1
+	install_bundle "$WEBDIR"/10/Manifest.test-bundle2
+	install_bundle "$WEBDIR"/10/Manifest.test-bundle3
+
+	# re-try again using a different order in the bundles
+
+	assert_file_exists "$TARGETDIR"/usr/share/clear/bundles/test-bundle1
+	assert_file_exists "$TARGETDIR"/usr/share/clear/bundles/test-bundle2
+	assert_file_exists "$TARGETDIR"/usr/share/clear/bundles/test-bundle3
+
+	run sudo sh -c "$SWUPD bundle-remove $SWUPD_OPTS test-bundle1 test-bundle3 test-bundle2"
+
+	assert_status_is "$SWUPD_OK"
+	expected_output=$(cat <<-EOM
+		Removing bundle: test-bundle1
+		Removing bundle: test-bundle3
+		Removing bundle: test-bundle2
+		Deleting bundle files...
+		Total deleted files: 7
+		Successfully removed 3 bundles
+	EOM
+	)
+	assert_is_output "$expected_output"
+
+	assert_file_not_exists "$TARGETDIR"/usr/share/clear/bundles/test-bundle1
+	assert_file_not_exists "$TARGETDIR"/usr/share/clear/bundles/test-bundle2
+	assert_file_not_exists "$TARGETDIR"/usr/share/clear/bundles/test-bundle3
 
 }

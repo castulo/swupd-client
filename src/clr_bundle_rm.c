@@ -96,6 +96,7 @@ static bool parse_options(int argc, char **argv)
 
 enum swupd_code bundle_remove_main(int argc, char **argv)
 {
+	struct list *bundles_list = NULL;
 	int ret;
 	const int steps_in_bundleremove = 1;
 
@@ -109,7 +110,15 @@ enum swupd_code bundle_remove_main(int argc, char **argv)
 
 	remove_set_option_force(cmdline_option_force);
 
-	ret = remove_bundles(bundles);
+	/* move the bundles provided in the command line into a
+	 * list so it is easier to handle them */
+	for (; *bundles; ++bundles) {
+		char *bundle = *bundles;
+		bundles_list = list_append_data(bundles_list, bundle);
+	}
+	bundles_list = list_head(bundles_list);
+	ret = remove_bundles(bundles_list);
+	list_free_list(bundles_list);
 
 	progress_finish_steps("bundle-remove", ret);
 	return ret;
