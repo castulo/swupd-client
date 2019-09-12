@@ -526,23 +526,23 @@ enum swupd_code remove_bundles(char **bundles)
 		*/
 		if (strcmp(bundle, "os-core") == 0) {
 			warn("\nBundle \"os-core\" not allowed to be removed, skipping it...\n");
-			ret = SWUPD_REQUIRED_BUNDLE_ERROR;
+			ret_code = SWUPD_REQUIRED_BUNDLE_ERROR;
 			bad++;
-			goto report_to_telemetry;
+			continue;
 		}
 
 		if (!is_installed_bundle(bundle)) {
 			warn("\nBundle \"%s\" is not installed, skipping it...\n", bundle);
-			ret = SWUPD_BUNDLE_NOT_TRACKED;
+			ret_code = SWUPD_BUNDLE_NOT_TRACKED;
 			bad++;
-			goto report_to_telemetry;
+			continue;
 		}
 
 		if (!search_bundle_in_manifest(current_mom, bundle)) {
 			error("\nBundle name is invalid, skipping it...\n");
-			ret = SWUPD_INVALID_BUNDLE;
+			ret_code = SWUPD_INVALID_BUNDLE;
 			bad++;
-			goto report_to_telemetry;
+			continue;
 		}
 
 		/* check if bundle is required by another installed bundle */
@@ -589,11 +589,11 @@ enum swupd_code remove_bundles(char **bundles)
 				}
 				list_free_list_and_data(simple_reqd_by, free);
 				list_free_list_and_data(tree_reqd_by, free);
-				ret = SWUPD_REQUIRED_BUNDLE_ERROR;
+				ret_code = SWUPD_REQUIRED_BUNDLE_ERROR;
 				bad++;
 				info("\nBundle '%s' is required by %d bundle%s, skipping it...\n", bundle, number_of_reqd, number_of_reqd == 1 ? "" : "s");
 				info("Use \"swupd bundle-remove --force %s\" to remove '%s' and all bundles that require it\n", bundle, bundle);
-				goto report_to_telemetry;
+				continue;
 
 			} else {
 
@@ -620,22 +620,6 @@ enum swupd_code remove_bundles(char **bundles)
 		unload_manifest(bundle, &current_mom->submanifests, &bundles_to_remove);
 		info("\nRemoving bundle: %s\n", bundle);
 		remove_tracked(bundle);
-
-	report_to_telemetry:
-		telemetry(ret ? TELEMETRY_CRIT : TELEMETRY_INFO,
-			  "bundleremove",
-			  "bundle=%s\n"
-			  "current_version=%d\n"
-			  "result=%d\n"
-			  "bytes=%ld\n",
-			  bundle,
-			  current_version,
-			  ret,
-			  total_curl_sz);
-		/* if at least one of the bundles fails to be removed, exit with a failure */
-		if (ret) {
-			ret_code = ret;
-		}
 	}
 
 	/* get the list of all files required by the installed bundles (except the ones to be removed) */
