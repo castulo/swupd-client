@@ -1,4 +1,4 @@
-# Writing tests for swupd-client
+# Writing tests for swupd-client --
 <br/>
 
 When writing tests for swupd-client, the swupd test library (testlib.bash) should
