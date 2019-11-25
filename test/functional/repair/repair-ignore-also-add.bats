@@ -36,7 +36,7 @@ test_setup() {
 		.* Missing file: .*/target-dir/usr/share/clear/bundles/test-bundle1 -> fixed
 		Repairing corrupt files
 		Removing extraneous files
-		Inspected 5 files
+		Inspected 9 files
 		  3 files were missing
 		    3 of 3 missing files were replaced
 		    0 of 3 missing files were not replaced
@@ -75,7 +75,7 @@ test_setup() {
 		Adding any missing files
 		Repairing corrupt files
 		Removing extraneous files
-		Inspected 5 files
+		Inspected 9 files
 		Calling post-update helper scripts
 		Repair successful
 	EOM

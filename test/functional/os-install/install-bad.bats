@@ -55,7 +55,7 @@ test_setup() {
 		Validate downloaded files
 		No extra files need to be downloaded
 		Installing base OS and selected bundles
-		Inspected 5 files
+		Inspected 9 files
 		  5 files were missing
 		    5 of 5 missing files were installed
 		    0 of 5 missing files were not installed

@@ -29,7 +29,7 @@ test_setup() {
 		    changed bundles   : 2
 		    new bundles       : 0
 		    deleted bundles   : 0
-		    changed files     : 4
+		    changed files     : 8
 		    new files         : 0
 		    deleted files     : 0
 		Validate downloaded files

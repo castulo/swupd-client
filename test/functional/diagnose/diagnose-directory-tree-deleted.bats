@@ -29,7 +29,7 @@ test_setup() {
 		.* File that should be deleted: .*/target-dir/testdir1/testdir2/testfile
 		.* File that should be deleted: .*/target-dir/testdir1/testdir2
 		.* File that should be deleted: .*/target-dir/testdir1
-		Inspected 4 files
+		Inspected 8 files
 		  3 files found which should be deleted
 		Use "swupd repair" to correct the problems in the system
 		Diagnose successful

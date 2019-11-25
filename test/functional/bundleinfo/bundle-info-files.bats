@@ -57,10 +57,14 @@ global_teardown() {
 		 - Maximum amount of disk size the bundle will take if installed \(includes dependencies\): .* KB
 		Files in bundle:
 		 - /usr/share/clear/bundles/test-bundle1
+		 - /usr
+		 - /usr/share
+		 - /usr/share/clear
+		 - /usr/share/clear/bundles
 		 - /foo/file_2
 		 - /foo
 		 - /file_1
-		Total files: 4
+		Total files: 8
 	EOM
 	)
 	assert_regex_is_output "$expected_output"
@@ -93,9 +97,13 @@ global_teardown() {
 		 - /file_3
 		 - /foo
 		 - /foo/file_2
+		 - /usr
+		 - /usr/share
+		 - /usr/share/clear
+		 - /usr/share/clear/bundles
 		 - /usr/share/clear/bundles/test-bundle1
 		 - /usr/share/clear/bundles/test-bundle2
-		Total files: 8
+		Total files: 12
 	EOM
 	)
 	assert_regex_is_output "$expected_output"
@@ -128,9 +136,13 @@ global_teardown() {
 		 - /file_5
 		 - /foo
 		 - /foo/file_2
+		 - /usr
+		 - /usr/share
+		 - /usr/share/clear
+		 - /usr/share/clear/bundles
 		 - /usr/share/clear/bundles/test-bundle1
 		 - /usr/share/clear/bundles/test-bundle2
-		Total files: 9
+		Total files: 13
 	EOM
 	)
 	assert_regex_is_output "$expected_output"

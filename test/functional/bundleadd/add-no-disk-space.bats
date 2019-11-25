@@ -119,32 +119,21 @@ test_setup() {
 		Finishing packs extraction...
 		Validate downloaded files
 		Starting download of remaining update content. This may take a while...
-		Error: Curl - Error downloading to local file - 'http://localhost:$(get_web_server_port "$TEST_NAME")/$TEST_NAME/web-dir/10/.*.tar'
-		Error: Curl - Check free space for $TEST_DIRNAME/testfs/state\\?
-		Error: Curl - Error downloading to local file - 'http://localhost:$(get_web_server_port "$TEST_NAME")/$TEST_NAME/web-dir/10/.*.tar'
-		Error: Curl - Check free space for $TEST_DIRNAME/testfs/state\\?
-		Error: Curl - Error downloading to local file - 'http://localhost:$(get_web_server_port "$TEST_NAME")/$TEST_NAME/web-dir/10/.*.tar'
-		Error: Curl - Check free space for $TEST_DIRNAME/testfs/state\\?
-		Error: Curl - Error downloading to local file - 'http://localhost:$(get_web_server_port "$TEST_NAME")/$TEST_NAME/web-dir/10/.*.tar'
-		Error: Curl - Check free space for $TEST_DIRNAME/testfs/state\\?
-		Error: Curl - Error downloading to local file - 'http://localhost:$(get_web_server_port "$TEST_NAME")/$TEST_NAME/web-dir/10/.*.tar'
-		Error: Curl - Check free space for $TEST_DIRNAME/testfs/state\\?
-		Error: Curl - Error downloading to local file - 'http://localhost:$(get_web_server_port "$TEST_NAME")/$TEST_NAME/web-dir/10/.*.tar'
-		Error: Curl - Check free space for $TEST_DIRNAME/testfs/state\\?
-		Error: Curl - Error downloading to local file - 'http://localhost:$(get_web_server_port "$TEST_NAME")/$TEST_NAME/web-dir/10/.*.tar'
-		Error: Curl - Check free space for $TEST_DIRNAME/testfs/state\\?
-		Error: Curl - Error downloading to local file - 'http://localhost:$(get_web_server_port "$TEST_NAME")/$TEST_NAME/web-dir/10/.*.tar'
-		Error: Curl - Check free space for $TEST_DIRNAME/testfs/state\\?
-		Error: Curl - Error downloading to local file - 'http://localhost:$(get_web_server_port "$TEST_NAME")/$TEST_NAME/web-dir/10/.*.tar'
-		Error: Curl - Check free space for $TEST_DIRNAME/testfs/state\\?
-		Error: Curl - Error downloading to local file - 'http://localhost:$(get_web_server_port "$TEST_NAME")/$TEST_NAME/web-dir/10/.*.tar'
-		Error: Curl - Check free space for $TEST_DIRNAME/testfs/state\\?
-		Error: Curl - Error downloading to local file - 'http://localhost:$(get_web_server_port "$TEST_NAME")/$TEST_NAME/web-dir/10/.*.tar'
-		Error: Curl - Check free space for $TEST_DIRNAME/testfs/state\\?
+	EOM
+	)
+	assert_regex_in_output "$expected_output"
+
+	# the out of space error can happen reandomly in two different parts:
+	# - while trying to create an empty file in which the data will be downloaded
+	# - while the file has already been created and the data is being downloaded
+	# because of that, the output is not deterministic so we need to check the output
+	# in two separate pieces
+
+	expected_output=$(cat <<-EOM
 		Error: Could not download some files from bundles, aborting bundle installation
 		Failed to install 1 of 1 bundles
 	EOM
 	)
-	assert_regex_is_output "$expected_output"
+	assert_regex_in_output "$expected_output"
 
 }

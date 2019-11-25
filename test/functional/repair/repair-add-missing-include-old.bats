@@ -35,7 +35,7 @@ test_setup() {
 		.* Missing file: .*/target-dir/usr/share/clear/bundles/test-bundle2 -> fixed
 		Repairing corrupt files
 		Removing extraneous files
-		Inspected 6 files
+		Inspected 10 files
 		  2 files were missing
 		    2 of 2 missing files were replaced
 		    0 of 2 missing files were not replaced

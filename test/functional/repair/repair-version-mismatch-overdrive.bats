@@ -33,7 +33,7 @@ test_setup() {
 		 -> Missing file: $TEST_DIRNAME/testfs/target-dir/usr/bin -> fixed
 		Repairing corrupt files
 		Removing extraneous files
-		Inspected 3 files
+		Inspected 6 files
 		  1 file was missing
 		    1 of 1 missing files were replaced
 		    0 of 1 missing files were not replaced

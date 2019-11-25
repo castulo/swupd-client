@@ -31,7 +31,7 @@ test_setup() {
 		Repairing corrupt files
 		 -> Hash mismatch for file: $PATH_PREFIX/usr/lib/kernel/testfile -> fixed
 		Removing extraneous files
-		Inspected 7 files
+		Inspected 10 files
 		  1 file did not match
 		    1 of 1 files were repaired
 		    0 of 1 files were not repaired

@@ -22,7 +22,7 @@ test_setup() {
 		Checking for corrupt files
 		.* Hash mismatch for file: .*/target-dir/usr/lib/kernel/testfile
 		Checking for extraneous files
-		Inspected 7 files
+		Inspected 10 files
 		  1 file did not match
 		Use "swupd repair" to correct the problems in the system
 		Diagnose successful

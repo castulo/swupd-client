@@ -29,7 +29,7 @@ test_setup() {
 		.* Missing file: .*/target-dir/foo/test-file1 -> fixed
 		Repairing corrupt files
 		Removing extraneous files
-		Inspected 7 files
+		Inspected 11 files
 		  1 file was missing
 		    1 of 1 missing files were replaced
 		    0 of 1 missing files were not replaced

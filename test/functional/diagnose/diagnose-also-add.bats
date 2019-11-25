@@ -33,7 +33,7 @@ test_setup() {
 		.* Missing file: .*/target-dir/usr/share/clear/bundles/test-bundle1
 		Checking for corrupt files
 		Checking for extraneous files
-		Inspected 5 files
+		Inspected 9 files
 		  3 files were missing
 		Use "swupd repair" to correct the problems in the system
 		Diagnose successful
@@ -67,7 +67,7 @@ test_setup() {
 		Checking for missing files
 		Checking for corrupt files
 		Checking for extraneous files
-		Inspected 5 files
+		Inspected 9 files
 		Diagnose successful
 	EOM
 	)

@@ -22,7 +22,7 @@ test_setup() {
 		.* Missing file: .*/target-dir/foo/test-file1
 		Checking for corrupt files
 		Checking for extraneous files
-		Inspected 7 files
+		Inspected 11 files
 		  1 file was missing
 		Use "swupd repair" to correct the problems in the system
 		Diagnose successful

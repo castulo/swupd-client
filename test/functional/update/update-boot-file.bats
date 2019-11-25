@@ -25,7 +25,7 @@ test_setup() {
 		    new bundles       : 0
 		    deleted bundles   : 0
 		    changed files     : 0
-		    new files         : 4
+		    new files         : 3
 		    deleted files     : 0
 		Validate downloaded files
 		No extra files need to be downloaded

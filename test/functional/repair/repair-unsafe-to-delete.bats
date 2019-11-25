@@ -31,7 +31,7 @@ test_setup() {
 		Adding any missing files
 		Repairing corrupt files
 		Removing extraneous files
-		Inspected 9 files
+		Inspected 13 files
 		Calling post-update helper scripts
 		Repair successful
 	EOM

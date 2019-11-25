@@ -27,7 +27,7 @@ test_setup() {
 		Repairing corrupt files
 		Removing extraneous files
 		.* File that should be deleted: .*/target-dir/testdir -> deleted
-		Inspected 2 files
+		Inspected 6 files
 		  1 file found which should be deleted
 		    1 of 1 files were deleted
 		    0 of 1 files were not deleted
