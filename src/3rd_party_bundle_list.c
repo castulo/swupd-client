@@ -107,9 +107,41 @@ static bool parse_options(int argc, char **argv)
 	return true;
 }
 
+static void print_repo_header(const char *repo_name)
+{
+	const int HEADER = 18;
+	int name_length = strlen(repo_name);
+	print_pattern("_", HEADER + name_length);
+	info(" 3rd-Party Repo: %s\n", repo_name);
+	print_pattern("_", HEADER + name_length);
+	info("\n");
+}
+
+static enum swupd_code list_bundles(struct repo *repo)
+{
+	enum swupd_code ret;
+
+	if (cmdline_local) {
+		ret = list_local_bundles(repo->version);
+	} else if (cmdline_option_deps != NULL) {
+		ret = show_included_bundles(cmdline_option_deps, repo->version);
+	} else if (cmdline_option_has_dep != NULL) {
+		ret = show_bundle_reqd_by(cmdline_option_has_dep, cmdline_option_all, repo->version);
+	} else {
+		ret = list_installable_bundles(repo->version);
+	}
+	info("\n");
+
+	return ret;
+}
+
 enum swupd_code third_party_bundle_list_main(int argc, char **argv)
 {
-	int ret;
+	struct list *repos = NULL;
+	struct list *iter = NULL;
+	char *state_dir;
+	char *path_prefix;
+	enum swupd_code ret;
 	const int steps_in_bundlelist = 1;
 
 	if (!parse_options(argc, argv)) {
@@ -124,23 +156,35 @@ enum swupd_code third_party_bundle_list_main(int argc, char **argv)
 		ret = swupd_init(SWUPD_ALL);
 	}
 
-	if (ret != 0) {
+	if (ret != SWUPD_OK) {
 		error("Failed swupd initialization, exiting now\n");
 		goto finish;
 	}
 
-	/*
-	if (cmdline_local) {
-		ret = list_local_bundles();
-	} else if (cmdline_option_deps != NULL) {
-		ret = show_included_bundles(cmdline_option_deps);
-	} else if (cmdline_option_has_dep != NULL) {
-		ret = show_bundle_reqd_by(cmdline_option_has_dep, cmdline_option_all);
-	} else {
-		ret = list_installable_bundles();
-	}
-	*/
+	/* load the existing 3rd-party repos from the repo.ini config file */
+	repos = third_party_get_repos();
 
+	/* backup the original state_dir and path_prefix values */
+	state_dir = strdup_or_die(globals.state_dir);
+	path_prefix = strdup_or_die(globals.path_prefix);
+
+	for (iter = repos; iter; iter = iter->next) {
+		struct repo *repo = iter->data;
+
+		/* set the appropriate content_dir and state_dir for the selected 3rd-party repo */
+		if (third_party_set_repo(state_dir, path_prefix, repo)) {
+			ret = SWUPD_COULDNT_CREATE_DIR;
+			goto clean_and_exit;
+		}
+
+		print_repo_header(repo->name);
+		ret = list_bundles(repo);
+	}
+
+clean_and_exit:
+	free_string(&state_dir);
+	free_string(&path_prefix);
+	list_free_list_and_data(repos, repo_free_data);
 	swupd_deinit();
 
 finish:
