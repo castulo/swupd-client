@@ -1,0 +1,25 @@
+name: C/C++ CI
+
+on: [push, pull_request]
+env:
+   TRAVIS: true
+
+jobs:
+
+  test_update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+    - uses: actions/checkout@v1
+
+    - name: build
+      run:  scripts/build_ci.bash
+
+    - name: Run prereq
+      run:  test/functional/generate-cert.prereq
+
+    - name: run check
+      run: DEBUG_TEST=true bats test/functional/3rd-party/3rd-party-bundle-add-basic.bats test/functional/update/update-bundle-removed.bats
+      env:
+        ACTIONS_RUNNER_DEBUG: true
+        ACTIONS_STEP_DEBUG: true
