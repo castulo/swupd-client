@@ -3,6 +3,7 @@ name: C/C++ CI
 on: [push, pull_request]
 env:
    TRAVIS: true
+   CAS: true
 
 jobs:
   unit_and_style:
@@ -30,7 +31,7 @@ jobs:
       if: failure()
       run: cat test-suite.log
 
-  test_update1:
+  functional_test_1:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -44,17 +45,20 @@ jobs:
 
     - name: run check
       run: |
-            UPDATE_TOTAL="$(find test/functional/update -name *.bats | wc -l)"
-            UPDATE_SUBGROUP1_TOTAL=30
-            UPDATE_SUBGROUP2_TOTAL="$((UPDATE_TOTAL - UPDATE_SUBGROUP1_TOTAL))"
-            UPDATE_SUBGROUP="$(find test/functional/update -name *.bats | head -n $UPDATE_SUBGROUP1_TOTAL | tr '\n' ' ')"
-            env TESTS="$UPDATE_SUBGROUP" make -e -j2 check
+            JOB_NUMBER=1
+            NUMBER_OF_JOBS=9
+            TESTS_TOTAL="$(find test/functional -name *.bats | wc -l)"
+            JOB_TESTS_TOTAL="$(( $TESTS_TOTAL/$NUMBER_OF_JOBS ))"
+            ALL_TESTS=($(find test/functional -name *.bats | sort -R | tr '\n' ' '))
+            BEGINNING=$(( "$JOB_TESTS_TOTAL" * ("$JOB_NUMBER" - 1) ))
+            JOB_TESTS=${ALL_TESTS[@]:$BEGINNING:$JOB_TESTS_TOTAL}
+            env TESTS="$JOB_TESTS" make -e -j2 check
 
     - name: print status
       if: failure()
       run: cat test-suite.log
 
-  test_update2:
+  functional_test_2:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -68,17 +72,20 @@ jobs:
 
     - name: run check
       run: |
-            UPDATE_TOTAL="$(find test/functional/update -name *.bats | wc -l)"
-            UPDATE_SUBGROUP1_TOTAL=30
-            UPDATE_SUBGROUP2_TOTAL="$((UPDATE_TOTAL - UPDATE_SUBGROUP1_TOTAL))"
-            UPDATE_SUBGROUP="$(find test/functional/update -name *.bats | tail -n $UPDATE_SUBGROUP2_TOTAL | tr '\n' ' ')"
-            env TESTS="$UPDATE_SUBGROUP" make -e -j2 check
+            JOB_NUMBER=2
+            NUMBER_OF_JOBS=9
+            TESTS_TOTAL="$(find test/functional -name *.bats | wc -l)"
+            JOB_TESTS_TOTAL="$(( $TESTS_TOTAL/$NUMBER_OF_JOBS ))"
+            ALL_TESTS=($(find test/functional -name *.bats | sort -R | tr '\n' ' '))
+            BEGINNING=$(( "$JOB_TESTS_TOTAL" * ("$JOB_NUMBER" - 1) ))
+            JOB_TESTS=${ALL_TESTS[@]:$BEGINNING:$JOB_TESTS_TOTAL}
+            env TESTS="$JOB_TESTS" make -e -j2 check
 
     - name: print status
       if: failure()
       run: cat test-suite.log
 
-  test_multiple:
+  functional_test_3:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -91,13 +98,21 @@ jobs:
       run:  test/functional/generate-cert.prereq
 
     - name: run check
-      run: env TESTS="$(find test/functional/{autoupdate,bundleinfo,verify-legacy,checkupdate,hashdump,mirror,usability,signature,info} -name *.bats -printf '%p ')" make -e -j2 check
+      run: |
+            JOB_NUMBER=3
+            NUMBER_OF_JOBS=9
+            TESTS_TOTAL="$(find test/functional -name *.bats | wc -l)"
+            JOB_TESTS_TOTAL="$(( $TESTS_TOTAL/$NUMBER_OF_JOBS ))"
+            ALL_TESTS=($(find test/functional -name *.bats | sort -R | tr '\n' ' '))
+            BEGINNING=$(( "$JOB_TESTS_TOTAL" * ("$JOB_NUMBER" - 1) ))
+            JOB_TESTS=${ALL_TESTS[@]:$BEGINNING:$JOB_TESTS_TOTAL}
+            env TESTS="$JOB_TESTS" make -e -j2 check
 
     - name: print status
       if: failure()
       run: cat test-suite.log
 
-  test_diagnose_search:
+  functional_test_4:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -110,13 +125,21 @@ jobs:
       run:  test/functional/generate-cert.prereq
 
     - name: run check
-      run: env TESTS="$(find test/functional/{diagnose,search} -name *.bats -printf '%p ')" make -e -j2 check
+      run: |
+            JOB_NUMBER=4
+            NUMBER_OF_JOBS=9
+            TESTS_TOTAL="$(find test/functional -name *.bats | wc -l)"
+            JOB_TESTS_TOTAL="$(( $TESTS_TOTAL/$NUMBER_OF_JOBS ))"
+            ALL_TESTS=($(find test/functional -name *.bats | sort -R | tr '\n' ' '))
+            BEGINNING=$(( "$JOB_TESTS_TOTAL" * ("$JOB_NUMBER" - 1) ))
+            JOB_TESTS=${ALL_TESTS[@]:$BEGINNING:$JOB_TESTS_TOTAL}
+            env TESTS="$JOB_TESTS" make -e -j2 check
 
     - name: print status
       if: failure()
       run: cat test-suite.log
 
-  test_os_install_bundle_list:
+  functional_test_5:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -129,13 +152,21 @@ jobs:
       run:  test/functional/generate-cert.prereq
 
     - name: run check
-      run: env TESTS="$(find test/functional/{os-install,bundlelist} -name *.bats -printf '%p ')" make -e -j2 check
+      run: |
+            JOB_NUMBER=5
+            NUMBER_OF_JOBS=9
+            TESTS_TOTAL="$(find test/functional -name *.bats | wc -l)"
+            JOB_TESTS_TOTAL="$(( $TESTS_TOTAL/$NUMBER_OF_JOBS ))"
+            ALL_TESTS=($(find test/functional -name *.bats | sort -R | tr '\n' ' '))
+            BEGINNING=$(( "$JOB_TESTS_TOTAL" * ("$JOB_NUMBER" - 1) ))
+            JOB_TESTS=${ALL_TESTS[@]:$BEGINNING:$JOB_TESTS_TOTAL}
+            env TESTS="$JOB_TESTS" make -e -j2 check
 
     - name: print status
       if: failure()
       run: cat test-suite.log
 
-  test_repair:
+  functional_test_6:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -148,13 +179,21 @@ jobs:
       run:  test/functional/generate-cert.prereq
 
     - name: run check
-      run: env TESTS="$(find test/functional/repair -name *.bats -printf '%p ')" make -e -j2 check
+      run: |
+            JOB_NUMBER=6
+            NUMBER_OF_JOBS=9
+            TESTS_TOTAL="$(find test/functional -name *.bats | wc -l)"
+            JOB_TESTS_TOTAL="$(( $TESTS_TOTAL/$NUMBER_OF_JOBS ))"
+            ALL_TESTS=($(find test/functional -name *.bats | sort -R | tr '\n' ' '))
+            BEGINNING=$(( "$JOB_TESTS_TOTAL" * ("$JOB_NUMBER" - 1) ))
+            JOB_TESTS=${ALL_TESTS[@]:$BEGINNING:$JOB_TESTS_TOTAL}
+            env TESTS="$JOB_TESTS" make -e -j2 check
 
     - name: print status
       if: failure()
       run: cat test-suite.log
 
-  test_bundle_add:
+  functional_test_7:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -167,13 +206,21 @@ jobs:
       run:  test/functional/generate-cert.prereq
 
     - name: run check
-      run: env TESTS="$(find test/functional/bundleadd -name *.bats -printf '%p ')" make -e -j2 check
+      run: |
+            JOB_NUMBER=7
+            NUMBER_OF_JOBS=9
+            TESTS_TOTAL="$(find test/functional -name *.bats | wc -l)"
+            JOB_TESTS_TOTAL="$(( $TESTS_TOTAL/$NUMBER_OF_JOBS ))"
+            ALL_TESTS=($(find test/functional -name *.bats | sort -R | tr '\n' ' '))
+            BEGINNING=$(( "$JOB_TESTS_TOTAL" * ("$JOB_NUMBER" - 1) ))
+            JOB_TESTS=${ALL_TESTS[@]:$BEGINNING:$JOB_TESTS_TOTAL}
+            env TESTS="$JOB_TESTS" make -e -j2 check
 
     - name: print status
       if: failure()
       run: cat test-suite.log
 
-  test_bundle_remove:
+  functional_test_8:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -186,13 +233,21 @@ jobs:
       run:  test/functional/generate-cert.prereq
 
     - name: run check
-      run: env TESTS="$(find test/functional/bundleremove -name *.bats -printf '%p ')" make -e -j2 check
+      run: |
+            JOB_NUMBER=8
+            NUMBER_OF_JOBS=9
+            TESTS_TOTAL="$(find test/functional -name *.bats | wc -l)"
+            JOB_TESTS_TOTAL="$(( $TESTS_TOTAL/$NUMBER_OF_JOBS ))"
+            ALL_TESTS=($(find test/functional -name *.bats | sort -R | tr '\n' ' '))
+            BEGINNING=$(( "$JOB_TESTS_TOTAL" * ("$JOB_NUMBER" - 1) ))
+            JOB_TESTS=${ALL_TESTS[@]:$BEGINNING:$JOB_TESTS_TOTAL}
+            env TESTS="$JOB_TESTS" make -e -j2 check
 
     - name: print status
       if: failure()
       run: cat test-suite.log
 
-  test_3rd_party:
+  functional_test_9:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -205,7 +260,15 @@ jobs:
       run:  test/functional/generate-cert.prereq
 
     - name: run check
-      run: env TESTS="$(find test/functional/3rd-party -name *.bats -printf '%p ')" make -e -j2 check
+      run: |
+            JOB_NUMBER=9
+            NUMBER_OF_JOBS=9
+            TESTS_TOTAL="$(find test/functional -name *.bats | wc -l)"
+            JOB_TESTS_TOTAL="$(( $TESTS_TOTAL/$NUMBER_OF_JOBS ))"
+            ALL_TESTS=($(find test/functional -name *.bats | sort -R | tr '\n' ' '))
+            BEGINNING=$(( "$JOB_TESTS_TOTAL" * ("$JOB_NUMBER" - 1) ))
+            JOB_TESTS=${ALL_TESTS[@]:$BEGINNING}
+            env TESTS="$JOB_TESTS" make -e -j2 check
 
     - name: print status
       if: failure()
