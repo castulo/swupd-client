@@ -8,6 +8,8 @@ load "../testlib"
 global_setup() {
 
 	create_test_environment "$TEST_NAME"
+	start_web_server -D "$WEBDIR"
+	port=$(get_web_server_port "$TEST_NAME")
 
 }
 
@@ -78,9 +80,9 @@ global_teardown() {
 	assert_in_output "$expected_output"
 }
 
-@test "MIR010: swupd operations when http mirror is used without allow-insecure-http" {
+@test "MIR010: swupd operations when http mirror is used with allow-insecure-http" {
 
-	run sudo sh -c "$SWUPD diagnose $SWUPD_OPTS --allow-insecure-http -u http://cdn.download.clearlinux.org/update"
+	run sudo sh -c "$SWUPD diagnose $SWUPD_OPTS --allow-insecure-http -u http://localhost:$port"
 
 	# Error is because server doesn't respond to this manifest, but connection was created
 	assert_status_is_not "$SWUPD_OK"
