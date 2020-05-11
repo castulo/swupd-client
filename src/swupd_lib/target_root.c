@@ -226,14 +226,15 @@ static enum swupd_code install_file_using_tar(const char *fullfile_path, const c
 	target_basename = sys_basename(target_file);
 	target_path = sys_dirname(target_file);
 
-	rename_target = sys_path_join("%s/staged/%s%s", globals.state_dir, STAGE_FILE_PREFIX, target_basename);
+
+	stage_dir = statedir_get_staged_dir();
+	staged_file = str_or_die("%s%s", STAGE_FILE_PREFIX, target_basename);
+	rename_target = sys_path_join("%s/%s", stage_dir, staged_file);
 	if (rename(fullfile_path, rename_target) != 0) {
 		ret = SWUPD_COULDNT_RENAME_FILE;
 		goto out;
 	}
 
-	stage_dir = statedir_get_staged_dir();
-	staged_file = str_or_die("%s%s", STAGE_FILE_PREFIX, target_basename);
 	err = tartar(stage_dir, staged_file, target_path);
 	if (err) {
 		ret = SWUPD_SUBPROCESS_ERROR;
