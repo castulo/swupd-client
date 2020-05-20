@@ -51,7 +51,7 @@ static bool download_successful(void *data)
 
 	if (untar_full_download(data) != 0) {
 		warn("Error for %s tarfile extraction, (check free space for %s?)\n",
-		     ((struct file *)data)->hash, globals.state_dir);
+		     ((struct file *)data)->hash, globals.cache_dir);
 	}
 	return true;
 }

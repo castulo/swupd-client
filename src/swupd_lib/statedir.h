@@ -191,7 +191,7 @@ char *statedir_get_version(void);
  * for upstream content will be included in the statedir, otherwise
  * a subset will be used
  */
-int statedir_create_dirs(const char *path, bool include_all);
+int statedir_create_dirs(bool include_all);
 
 /**
  * @brief Sets the path to the statedir.
@@ -206,6 +206,20 @@ bool statedir_set_path(char *path);
  * @param path The path of the statedir duplicate
  */
 bool statedir_dup_set_path(char *path);
+
+/**
+ * @brief Sets the path to the cache dir.
+ *
+ * @param path The path of the cache dir
+ */
+bool statedir_set_cache_path(char *path);
+
+/**
+ * @brief Sets the path to the data dir.
+ *
+ * @param path The path of the data dir
+ */
+bool statedir_set_data_path(char *path);
 
 #ifdef __cplusplus
 }

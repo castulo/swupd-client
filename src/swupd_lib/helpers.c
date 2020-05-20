@@ -98,14 +98,13 @@ int ensure_root_owned_dir(const char *dirname)
 	return true; /* doesn't exist now */
 }
 
-bool safeguard_tracking_dir(const char *state_dir)
+bool safeguard_tracking_dir(const char *tracking_dir, mode_t mode)
 {
 	int ret = 0;
 	char *src = NULL;
-	char *tracking_dir;
 	char *rmfile;
 
-	tracking_dir = sys_path_join("%s/%s", state_dir, "bundles");
+	char *path = sys_dirname(tracking_dir);
 
 	/* if state_dir_parent/bundles doesn't exist or is empty, assume this is
 	 * the first time tracking installed bundles. Since we don't know what the
@@ -117,7 +116,7 @@ bool safeguard_tracking_dir(const char *state_dir)
 		if (!sys_file_exists(src)) {
 			/* there is no bundles directory to copy from */
 			FREE(src);
-			FREE(tracking_dir);
+			FREE(path);
 			return false;
 		}
 
@@ -130,21 +129,22 @@ bool safeguard_tracking_dir(const char *state_dir)
 		 * installed on the system and therefore has a tracking file under
 		 * /usr/share/clear/bundles. A simple cp -a of that directory will
 		 * accurately track that bundle as manually installed. */
-		ret = copy_all(src, state_dir);
+		ret = copy_all(src, path);
 		if (ret) {
 			goto out;
 		}
 
 		/* remove uglies that live in the system tracking directory */
+		// TODO(castulo): is this still required?
 		rmfile = sys_path_join("%s/%s", tracking_dir, ".MoM");
 		(void)unlink(rmfile);
 		FREE(rmfile);
 
 		/* set perms on the directory correctly */
-		ret = chmod(tracking_dir, S_IRWXU);
+		ret = chmod(tracking_dir, mode);
 	}
 out:
-	FREE(tracking_dir);
+	FREE(path);
 	FREE(src);
 	if (ret) {
 		return false;
@@ -429,13 +429,13 @@ enum swupd_code swupd_init(enum swupd_init_config config)
 			}
 		}
 
-		if (statedir_create_dirs(globals.state_dir, INCLUDE_ALL_STATE_DIRS)) {
+		if (statedir_create_dirs(INCLUDE_ALL_STATE_DIRS)) { // TODO: globals.state_dir,
 			ret = SWUPD_COULDNT_CREATE_DIR;
 			goto out_fds;
 		}
 
 		if (globals.state_dir_cache != NULL) {
-			if (statedir_create_dirs(globals.state_dir_cache, INCLUDE_ALL_STATE_DIRS)) {
+			if (statedir_create_dirs(INCLUDE_ALL_STATE_DIRS)) { // TODO: globals.state_dir_cache
 				ret = SWUPD_COULDNT_CREATE_DIR;
 				goto out_fds;
 			}

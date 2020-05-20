@@ -193,14 +193,23 @@ static bool is_valid_integer_format(char *str)
 	return true;
 }
 
-static void set_default_state_dir(void)
-{
-	(void)statedir_set_path(STATE_DIR);
-}
-
 static void set_default_state_dir_cache(void)
 {
 	globals.state_dir_cache = NULL;
+}
+
+static void set_default_cache_dir(void)
+{
+	(void)statedir_set_cache_path(STATE_DIR);
+}
+
+static void set_default_data_dir(void)
+{
+	char *default_data_dir = NULL;
+
+	default_data_dir = sys_path_join("%s/%s", globals.path_prefix, STATE_DIR);
+	(void)statedir_set_data_path(default_data_dir);
+	FREE(default_data_dir);
 }
 
 static bool set_format_string(char *format)
@@ -382,16 +391,22 @@ static bool set_assume_option(char *option)
 
 bool globals_init(void)
 {
-	if (!globals.state_dir) {
-		set_default_state_dir();
+	if (!globals.path_prefix) {
+		set_default_path_prefix();
 	}
 
 	if (!globals.state_dir_cache) {
 		set_default_state_dir_cache();
 	}
 
-	if (!globals.path_prefix) {
-		set_default_path_prefix();
+	if (!globals.cache_dir) {
+		set_default_cache_dir();
+	}
+
+	// data_dir is relative to the path_prefix so ALWAYS has to run after
+	// initializing path_prefix
+	if (!globals.data_dir) {
+		set_default_data_dir();
 	}
 
 	if (!globals.format_string && !set_default_format_string()) {
@@ -426,7 +441,8 @@ bool globals_init(void)
 	 * some processed like when working with 3rd-party repositories
 	 * so we can recover them */
 	globals_bkp.path_prefix = strdup_or_die(globals.path_prefix);
-	globals_bkp.state_dir = strdup_or_die(globals.state_dir);
+	globals_bkp.cache_dir = strdup_or_die(globals.cache_dir);
+	globals_bkp.data_dir = strdup_or_die(globals.data_dir);
 	globals_bkp.version_url = strdup_or_die(globals.version_url);
 	globals_bkp.content_url = strdup_or_die(globals.content_url);
 
@@ -443,12 +459,14 @@ void globals_deinit(void)
 	FREE(globals.path_prefix);
 	FREE(globals.format_string);
 	FREE(globals.mounted_dirs);
-	FREE(globals.state_dir);
 	FREE(globals.state_dir_cache);
+	FREE(globals.cache_dir);
+	FREE(globals.data_dir);
 	timelist_free(globals.global_times);
 	globals.global_times = NULL;
 	FREE(globals_bkp.path_prefix);
-	FREE(globals_bkp.state_dir);
+	FREE(globals_bkp.cache_dir);
+	FREE(globals_bkp.data_dir);
 	FREE(globals_bkp.version_url);
 	FREE(globals_bkp.content_url);
 }
@@ -536,7 +554,7 @@ static bool global_parse_opt(int opt, char *optarg)
 		}
 		return true;
 	case 'S':
-		if (!statedir_set_path(optarg)) {
+		if (!statedir_set_cache_path(optarg) || !statedir_set_data_path(optarg)) {
 			error("Invalid --statedir argument\n\n");
 			return false;
 		}

@@ -17,6 +17,7 @@
  *
  */
 
+#include <errno.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -52,33 +53,41 @@
 /* Name of the directory that contains statedir of a 3rd-party repo */
 #define THIRD_PARTY_DIR "3rd-party"
 
+/* Permissions for a file readable by users */
+#define WORLD_READABLE (S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH)
 
-/* ************* */
-/* State section */
-/* ************* */
+/* Permissions for a root only file */
+#define ROOT_OWNED S_IRWXU
+
+/* ******************** */
+/* State (data) section */
+/* ******************** */
+
+/* All these data is relative to the path_prefix of the system */
+
 char *statedir_get_tracking_dir(void)
 {
-	return sys_path_join("%s/%s", globals.state_dir, TRACKING_DIR);
+	return sys_path_join("%s/%s", globals.data_dir, TRACKING_DIR);
 }
 
 char *statedir_get_tracking_file(const char *bundle_name)
 {
-	return sys_path_join("%s/%s/%s", globals.state_dir, TRACKING_DIR, bundle_name);
+	return sys_path_join("%s/%s/%s", globals.data_dir, TRACKING_DIR, bundle_name);
 }
 
 char *statedir_get_telemetry_record(char *record)
 {
-	return sys_path_join("%s/%s/%s", globals.state_dir, TELEMETRY_DIR, record);
+	return sys_path_join("%s/%s/%s", globals.data_dir, TELEMETRY_DIR, record);
 }
 
 char *statedir_get_swupd_lock(void)
 {
-	return sys_path_join("%s/%s", globals.state_dir, LOCK);
+	return sys_path_join("%s/%s", globals.data_dir, LOCK);
 }
 
 char *statedir_get_version(void)
 {
-	return sys_path_join("%s/%s", globals.state_dir, VERSION_FILE);
+	return sys_path_join("%s/%s", globals.data_dir, VERSION_FILE);
 }
 
 /* ************* */
@@ -111,7 +120,7 @@ static char *get_url(void)
 char *statedir_get_staged_dir(void)
 {
 	char *url = get_url();
-	char *dir = sys_path_join("%s/%s/%s/%s", globals.state_dir, CACHE_DIR, url, STAGED_DIR);
+	char *dir = sys_path_join("%s/%s/%s/%s", globals.cache_dir, CACHE_DIR, url, STAGED_DIR);
 	FREE(url);
 
 	return dir;
@@ -128,7 +137,7 @@ static char *get_staged_file(char *state, char *file_hash)
 
 char *statedir_get_staged_file(char *file_hash)
 {
-	return get_staged_file(globals.state_dir, file_hash);
+	return get_staged_file(globals.cache_dir, file_hash);
 }
 
 char *statedir_dup_get_staged_file(char *file_hash)
@@ -139,7 +148,7 @@ char *statedir_dup_get_staged_file(char *file_hash)
 char *statedir_get_delta_dir(void)
 {
 	char *url = get_url();
-	char *dir = sys_path_join("%s/%s/%s/%s", globals.state_dir, CACHE_DIR, url, DELTA_DIR);
+	char *dir = sys_path_join("%s/%s/%s/%s", globals.cache_dir, CACHE_DIR, url, DELTA_DIR);
 	FREE(url);
 
 	return dir;
@@ -148,7 +157,7 @@ char *statedir_get_delta_dir(void)
 char *statedir_get_download_dir(void)
 {
 	char *url = get_url();
-	char *dir = sys_path_join("%s/%s/%s/%s", globals.state_dir, CACHE_DIR, url, DOWNLOAD_DIR);
+	char *dir = sys_path_join("%s/%s/%s/%s", globals.cache_dir, CACHE_DIR, url, DOWNLOAD_DIR);
 	FREE(url);
 
 	return dir;
@@ -157,7 +166,7 @@ char *statedir_get_download_dir(void)
 char *statedir_get_fullfile_tar(char *file_hash)
 {
 	char *url = get_url();
-	char *dir = sys_path_join("%s/%s/%s/%s/.%s.tar", globals.state_dir, CACHE_DIR, url, DOWNLOAD_DIR, file_hash);
+	char *dir = sys_path_join("%s/%s/%s/%s/.%s.tar", globals.cache_dir, CACHE_DIR, url, DOWNLOAD_DIR, file_hash);
 	FREE(url);
 
 	return dir;
@@ -166,7 +175,7 @@ char *statedir_get_fullfile_tar(char *file_hash)
 char *statedir_get_fullfile_renamed_tar(char *file_hash)
 {
 	char *url = get_url();
-	char *dir = sys_path_join("%s/%s/%s/%s/%s.tar", globals.state_dir, CACHE_DIR, url, DOWNLOAD_DIR, file_hash);
+	char *dir = sys_path_join("%s/%s/%s/%s/%s.tar", globals.cache_dir, CACHE_DIR, url, DOWNLOAD_DIR, file_hash);
 	FREE(url);
 
 	return dir;
@@ -175,7 +184,7 @@ char *statedir_get_fullfile_renamed_tar(char *file_hash)
 char *statedir_get_manifest_root_dir(void)
 {
 	char *url = get_url();
-	char *dir = sys_path_join("%s/%s/%s/%s", globals.state_dir, CACHE_DIR, url, MANIFEST_DIR);
+	char *dir = sys_path_join("%s/%s/%s/%s", globals.cache_dir, CACHE_DIR, url, MANIFEST_DIR);
 	FREE(url);
 
 	return dir;
@@ -192,7 +201,7 @@ static char *get_manifest_dir(char *state, int version)
 
 char *statedir_get_manifest_dir(int version)
 {
-	return get_manifest_dir(globals.state_dir, version);
+	return get_manifest_dir(globals.cache_dir, version);
 }
 
 char *statedir_dup_get_manifest_dir(int version)
@@ -203,7 +212,7 @@ char *statedir_dup_get_manifest_dir(int version)
 char *statedir_get_manifest_tar(int version, char *component)
 {
 	char *url = get_url();
-	char *dir = sys_path_join("%s/%s/%s/%s/%i/Manifest.%s.tar", globals.state_dir, CACHE_DIR, url, MANIFEST_DIR, version, component);
+	char *dir = sys_path_join("%s/%s/%s/%s/%i/Manifest.%s.tar", globals.cache_dir, CACHE_DIR, url, MANIFEST_DIR, version, component);
 	FREE(url);
 
 	return dir;
@@ -220,7 +229,7 @@ static char *get_manifest(char *state, int version, char *component)
 
 char *statedir_get_manifest(int version, char *component)
 {
-	return get_manifest(globals.state_dir, version, component);
+	return get_manifest(globals.cache_dir, version, component);
 }
 
 char *statedir_dup_get_manifest(int version, char *component)
@@ -231,7 +240,7 @@ char *statedir_dup_get_manifest(int version, char *component)
 char *statedir_get_hashed_manifest(int version, char *component, char *manifest_hash)
 {
 	char *url = get_url();
-	char *dir = sys_path_join("%s/%s/%s/%s/%i/Manifest.%s.%s", globals.state_dir, CACHE_DIR, url, MANIFEST_DIR, version, component, manifest_hash);
+	char *dir = sys_path_join("%s/%s/%s/%s/%i/Manifest.%s.%s", globals.cache_dir, CACHE_DIR, url, MANIFEST_DIR, version, component, manifest_hash);
 	FREE(url);
 
 	return dir;
@@ -240,7 +249,7 @@ char *statedir_get_hashed_manifest(int version, char *component, char *manifest_
 char *statedir_get_manifest_delta_dir(void)
 {
 	char *url = get_url();
-	char *dir = sys_path_join("%s/%s/%s/%s", globals.state_dir, CACHE_DIR, url, MANIFEST_DIR);
+	char *dir = sys_path_join("%s/%s/%s/%s", globals.cache_dir, CACHE_DIR, url, MANIFEST_DIR);
 	FREE(url);
 
 	return dir;
@@ -249,7 +258,7 @@ char *statedir_get_manifest_delta_dir(void)
 char *statedir_get_manifest_delta(char *bundle, int from_version, int to_version)
 {
 	char *url = get_url();
-	char *dir = sys_path_join("%s/%s/%s/%s/Manifest-%s-delta-from-%i-to-%i", globals.state_dir, CACHE_DIR, url, MANIFEST_DIR, bundle, from_version, to_version);
+	char *dir = sys_path_join("%s/%s/%s/%s/Manifest-%s-delta-from-%i-to-%i", globals.cache_dir, CACHE_DIR, url, MANIFEST_DIR, bundle, from_version, to_version);
 	FREE(url);
 
 	return dir;
@@ -258,7 +267,7 @@ char *statedir_get_manifest_delta(char *bundle, int from_version, int to_version
 char *statedir_get_delta_pack_dir(void)
 {
 	char *url = get_url();
-	char *dir = sys_path_join("%s/%s/%s", globals.state_dir, CACHE_DIR, url);
+	char *dir = sys_path_join("%s/%s/%s", globals.cache_dir, CACHE_DIR, url);
 	FREE(url);
 
 	return dir;
@@ -275,7 +284,7 @@ static char *get_delta_pack(char *state, char *bundle, int from_version, int to_
 
 char *statedir_get_delta_pack(char *bundle, int from_version, int to_version)
 {
-	return get_delta_pack(globals.state_dir, bundle, from_version, to_version);
+	return get_delta_pack(globals.cache_dir, bundle, from_version, to_version);
 }
 
 char *statedir_dup_get_delta_pack(char *bundle, int from_version, int to_version)
@@ -283,86 +292,122 @@ char *statedir_dup_get_delta_pack(char *bundle, int from_version, int to_version
 	return get_delta_pack(globals.state_dir_cache, bundle, from_version, to_version);
 }
 
-static int create_root_owned_dirs(const char *path, const char **dirs, unsigned int dir_count)
+static int create_dir(const char *path, const char *dirname, mode_t mode)
 {
 	int ret = 0;
-	unsigned int i;
 	char *dir = NULL;
 
-	for (i = 0; i < dir_count; i++) {
+	dir = sys_path_join("%s/%s", path, dirname);
 
-		dir = sys_path_join("%s/%s", path, dirs[i]);
-		ret = ensure_root_owned_dir(dir);
-		if (ret) {
-			ret = mkdir(dir, S_IRWXU);
-			if (ret) {
-				error("failed to create %s\n", dir);
-				FREE(dir);
-				return -1;
-			}
-		}
-		FREE(dir);
+	// if the directory already exist and has correct permissions
+	// we are done
+	if (sys_is_dir(dir) && sys_is_mode(dir, mode)) {
+		goto exit;
 	}
 
-	return 0;
+	// remove the existing directory recursively (if any)
+	ret = sys_rm_recursive(dir);
+	if (ret != 0 && ret != -ENOENT) {
+		error("%s is the wrong type or has the wrong permissions but failed to be removed\n", dir);
+		goto exit;
+	}
+
+	// create the directory with the right permissions
+	ret = mkdir(dir, mode);
+	if (ret) {
+		error("failed to create directory %s\n", dir);
+	}
+
+exit:
+	FREE(dir);
+
+	return ret;
 }
 
-int statedir_create_dirs(const char *path, bool include_all)
+static int create_cache_dirs(void)
 {
 	int ret = 0;
 	char *sub_path = NULL;
 	char *url = get_url();
-	unsigned int count = include_all ? 4 : 2;
+	const char *cache_dirs[] = { DELTA_DIR, STAGED_DIR, DOWNLOAD_DIR, MANIFEST_DIR };
 
-	const char *state_root_dirs[] = { CACHE_DIR, TRACKING_DIR, TELEMETRY_DIR, THIRD_PARTY_DIR };
-	const char *cache_dirs[] = { url };
-	const char *url_dirs[] = { DELTA_DIR, STAGED_DIR, DOWNLOAD_DIR, MANIFEST_DIR};
+	// create the "cache" directory
+	ret = create_dir(globals.cache_dir, CACHE_DIR, WORLD_READABLE);
+	if (ret) {
+		goto exit;
+	}
 
-	// check for existence
-	if (ensure_root_owned_dir(path)) {
-		// state dir doesn't exist
-		if (mkdir_p(path) != 0 || chmod(path, S_IRWXU) != 0) {
-			error("failed to create %s\n", path);
-			return -1;
+	// create the url-dependent directory
+	sub_path = sys_path_join("%s/%s", globals.cache_dir, CACHE_DIR);
+	ret = create_dir(sub_path, url, WORLD_READABLE);
+	if (ret) {
+		goto exit;
+	}
+
+	// create all cache directories
+	FREE(sub_path);
+	sub_path = sys_path_join("%s/%s/%s", globals.cache_dir, CACHE_DIR, url);
+	for (unsigned int i = 0; i < sizeof(cache_dirs) / sizeof(cache_dirs[0]); i++) {
+		if (str_cmp(cache_dirs[i], STAGED_DIR) == 0) {
+			// access to the staged dir should be restricted to root only
+			ret = create_dir(sub_path, cache_dirs[i], ROOT_OWNED);
+		} else {
+			ret = create_dir(sub_path, cache_dirs[i], WORLD_READABLE);
+		}
+		if (ret) {
+			goto exit;
 		}
 	}
 
-	ret = create_root_owned_dirs(path, state_root_dirs, count);
-	if (ret) {
-		goto exit;
-	}
-
-	sub_path = sys_path_join("%s/%s", path, CACHE_DIR);
-	count = sizeof(cache_dirs) / sizeof(cache_dirs[0]);
-	ret = create_root_owned_dirs(sub_path, cache_dirs, count);
-	if (ret) {
-		goto exit;
-	}
-	FREE(sub_path);
-
-	sub_path = sys_path_join("%s/%s/%s", path, CACHE_DIR, url);
-	count = sizeof(url_dirs) / sizeof(url_dirs[0]);
-	ret = create_root_owned_dirs(sub_path, url_dirs, count);
-	if (ret) {
-		goto exit;
-	}
-
-	/* Do a final check to make sure that the top level dir wasn't
-	 * tampered with whilst we were creating the dirs */
-	if (ensure_root_owned_dir(path)) {
-		ret = -1;
-		goto exit;
-	}
-
-	/* make sure the tracking directory is not empty, if it is,
-	 * mark all installed bundles as tracked */
-	if (!safeguard_tracking_dir(path)) {
-		debug("There was an error accessing the tracking directory %s/bundles\n", path);
-	}
-
 exit:
-	FREE(sub_path);
 	FREE(url);
+	FREE(sub_path);
+
+	return ret;
+}
+
+static int create_data_dirs(bool include_all)
+{
+	int ret = 0;
+	const char *data_dirs[] = { TRACKING_DIR, TELEMETRY_DIR, THIRD_PARTY_DIR };
+	unsigned int count = include_all ? 3 : 1;
+
+	// create all data directories
+	for (unsigned int i = 0; i < count; i++) {
+		ret = create_dir(globals.data_dir, data_dirs[i], WORLD_READABLE);
+		if (ret) {
+			return ret;
+		}
+	}
+
+	return ret;
+}
+
+int statedir_create_dirs(bool include_all)
+{
+	int ret;
+	// char sub_path = NULL;
+	char *tracking_dir = NULL;
+
+	ret = create_cache_dirs();
+	if (ret) {
+		return ret;
+	}
+
+	// the data directories are relative to the system
+	ret = create_data_dirs(include_all);
+	if (ret) {
+		return ret;
+	}
+
+	// make sure the tracking directory is not empty, if it is,
+	// mark all installed bundles as tracked
+	tracking_dir = statedir_get_tracking_dir();
+	if (!safeguard_tracking_dir(tracking_dir, WORLD_READABLE)) {
+		debug("There was an error accessing the tracking directory %s\n", tracking_dir);
+	}
+	FREE(tracking_dir);
+
 	return ret;
 }
 
@@ -392,12 +437,17 @@ static bool set_state_path(char** state, char *path)
 	return true;
 }
 
-bool statedir_set_path(char *path)
-{
-	return set_state_path(&globals.state_dir, path);
-}
-
 bool statedir_dup_set_path(char *path)
 {
 	return set_state_path(&globals.state_dir_cache, path);
+}
+
+bool statedir_set_cache_path(char *path)
+{
+	return set_state_path(&globals.cache_dir, path);
+}
+
+bool statedir_set_data_path(char *path)
+{
+	return set_state_path(&globals.data_dir, path);
 }

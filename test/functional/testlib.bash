@@ -1990,7 +1990,7 @@ create_test_environment() { # swupd_function
 	debug_msg "Creating a state dir"
 	sudo mkdir -p "$statedir"/{telemetry,bundles,3rd-party,cache}
 	sudo mkdir -p "$statedir"/cache/file"$(echo "$path" | tr / _)"_"$env_name"_web-dir/{staged,download,delta,manifest}
-	sudo chmod -R 0700 "$statedir"
+	sudo chmod -R 0700 "$statedir"/cache/file"$(echo "$path" | tr / _)"_"$env_name"_web-dir/staged
 
 	# every environment needs to have at least the os-core bundle so this should be
 	# added by default to every test environment unless specified otherwise
