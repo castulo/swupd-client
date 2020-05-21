@@ -36,6 +36,9 @@
 # Specify alternate swupd state directory (string value)
 #statedir=<PATH>
 
+# Specify alternate swupd cache directory (string value)
+#cachedir=<PATH>
+
 # Specify alternate path to swupd certificates (string value)
 #certpath=<PATH>
 

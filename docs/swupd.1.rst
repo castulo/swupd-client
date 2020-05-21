@@ -84,6 +84,9 @@ used to modify the core behavior and resources that swupd uses.
 -S <path>, --statedir=<path>    Specify an alternate swupd state directory.
         Normally ``swupd`` uses ``/var/lib/swupd``.
 
+-K <path>, --cachedir=<path>    Specify an alternate swupd cache directory.
+        Normally ``swupd`` uses ``/var/lib/swupd``.
+
 -C <path>, --certpath=<cert>  Specify alternate path to swupd certificate store (pem file).
         Default is /usr/share/clear/update-ca/Swupd_Root.pem
 

@@ -109,8 +109,8 @@ static int import_temp_certificate(int version, char *hash)
 	char *cert_tar, *cert, *url;
 	int ret = 0;
 
-	cert_tar = sys_path_join("%s/%s", globals.state_dir, "temp_cert.tar");
-	cert = sys_path_join("%s/%s", globals.state_dir, hash);
+	cert_tar = sys_path_join("%s/%s", globals.data_dir, "temp_cert.tar");
+	cert = sys_path_join("%s/%s", globals.data_dir, hash);
 
 	url = str_or_die("%s/%d/files/%s.tar", globals.content_url, version, hash);
 
@@ -124,7 +124,7 @@ static int import_temp_certificate(int version, char *hash)
 		goto out;
 	}
 
-	ret = archives_extract_to(cert_tar, globals.state_dir);
+	ret = archives_extract_to(cert_tar, globals.data_dir);
 	if (ret != 0) {
 		goto out;
 	}
@@ -158,8 +158,8 @@ static int import_certificate_from_version(int version)
 	struct list *i;
 	struct file *cert_file = NULL;
 
-	os_core_tar = sys_path_join("%s/%s", globals.state_dir, "temp_manifest.tar");
-	os_core = sys_path_join("%s/%s", globals.state_dir, "Manifest.os-core");
+	os_core_tar = sys_path_join("%s/%s", globals.data_dir, "temp_manifest.tar");
+	os_core = sys_path_join("%s/%s", globals.data_dir, "Manifest.os-core");
 	url = str_or_die("%s/%d/%s", globals.content_url, version, "Manifest.os-core.tar");
 
 	unlink(os_core_tar);
@@ -168,7 +168,7 @@ static int import_certificate_from_version(int version)
 		goto out;
 	}
 
-	ret = archives_extract_to(os_core_tar, globals.state_dir);
+	ret = archives_extract_to(os_core_tar, globals.data_dir);
 	if (ret != 0) {
 		goto out;
 	}

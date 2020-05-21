@@ -48,7 +48,7 @@ char *get_repo_content_path(const char *repo_name)
 
 static char *get_repo_state_dir(const char *repo_name)
 {
-	return sys_path_join("%s/%s/%s", globals_bkp.state_dir, SWUPD_3RD_PARTY_DIRNAME, repo_name);
+	return sys_path_join("%s/%s/%s", globals_bkp.data_dir, SWUPD_3RD_PARTY_DIRNAME, repo_name);
 }
 
 /**
@@ -315,7 +315,8 @@ enum swupd_code third_party_set_repo(struct repo *repo, bool sigcheck)
 		error("Unable to create the state directories for repository %s\n\n", repo->name);
 		return SWUPD_COULDNT_CREATE_DIR;
 	}
-	statedir_set_path(repo_state_dir);
+	statedir_set_data_path(repo_state_dir);
+	statedir_set_cache_path(repo_state_dir);
 	FREE(repo_state_dir);
 
 	return SWUPD_OK;
@@ -380,7 +381,8 @@ static enum swupd_code third_party_find_bundle(const char *bundle, struct list *
 
 clean_and_exit:
 	set_path_prefix(globals_bkp.path_prefix);
-	statedir_set_path(globals_bkp.state_dir);
+	statedir_set_cache_path(globals_bkp.cache_dir);
+	statedir_set_data_path(globals_bkp.data_dir);
 	set_content_url(globals_bkp.content_url);
 	set_version_url(globals_bkp.version_url);
 
@@ -445,7 +447,8 @@ enum swupd_code third_party_run_operation(struct list *bundles, const char *repo
 			/* return the global variables to the original values */
 		next:
 			set_path_prefix(globals_bkp.path_prefix);
-			statedir_set_path(globals_bkp.state_dir);
+			statedir_set_cache_path(globals_bkp.cache_dir);
+			statedir_set_data_path(globals_bkp.data_dir);
 			set_content_url(globals_bkp.content_url);
 			set_version_url(globals_bkp.version_url);
 		}

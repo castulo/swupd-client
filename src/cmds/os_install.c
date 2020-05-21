@@ -166,13 +166,15 @@ enum swupd_code install_main(int argc, char **argv)
 	}
 
 	/* Initialize the default state dir of the system to be installed */
-	char *new_os_state = sys_path_join("%s/%s", globals.path_prefix, "/var/lib/swupd");
+	char *new_os_data = sys_path_join("%s/%s", globals.path_prefix, "/var/lib/swupd");
+	statedir_set_data_path(new_os_data);
 	if (statedir_create_dirs(INCLUDE_ALL_STATE_DIRS)) {  // TODO: new_os_state
 		ret = SWUPD_COULDNT_CREATE_DIR;
-		FREE(new_os_state);
+		FREE(new_os_data);
 		return ret;
 	}
-	FREE(new_os_state);
+	FREE(new_os_data);
+	statedir_set_data_path(globals_bkp.data_dir);
 
 	/* set options needed for the install in the verify command */
 	verify_set_option_quick(true);

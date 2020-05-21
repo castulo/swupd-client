@@ -297,10 +297,16 @@ static int create_dir(const char *path, const char *dirname, mode_t mode)
 	int ret = 0;
 	char *dir = NULL;
 
-	dir = sys_path_join("%s/%s", path, dirname);
+	// if the path to the new directory doesn't exist, create it
+	if (!sys_is_dir(path)) {
+		if (mkdir_p(path) || chmod(path, WORLD_READABLE)) {
+			return -1;
+		}
+	}
 
 	// if the directory already exist and has correct permissions
 	// we are done
+	dir = sys_path_join("%s/%s", path, dirname);
 	if (sys_is_dir(dir) && sys_is_mode(dir, mode)) {
 		goto exit;
 	}

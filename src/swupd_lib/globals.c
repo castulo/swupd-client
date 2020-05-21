@@ -395,6 +395,7 @@ bool globals_init(void)
 		set_default_path_prefix();
 	}
 
+	// TODO(castulo): I don't think this is ever being used
 	if (!globals.state_dir_cache) {
 		set_default_state_dir_cache();
 	}
@@ -500,6 +501,8 @@ static const struct option global_opts[] = {
 	{ "path", required_argument, 0, 'p' },
 	{ "port", required_argument, 0, 'P' },
 	{ "statedir", required_argument, 0, 'S' },
+	{ "cachedir", required_argument, 0, 'K' },
+	{ "datadir", required_argument, 0, 'Z' },
 	{ "time", no_argument, 0, 't' },
 	{ "url", required_argument, 0, 'u' },
 	{ "versionurl", required_argument, 0, 'v' },
@@ -558,6 +561,14 @@ static bool global_parse_opt(int opt, char *optarg)
 			error("Invalid --statedir argument\n\n");
 			return false;
 		}
+		return true;
+	case 'K':
+		if (!statedir_set_cache_path(optarg)) {
+			error("Invalid --cachedir argument\n\n");
+			return false;
+		}
+		return true;
+	case 'Z':
 		return true;
 	case 'n':
 		globals.sigcheck = !optarg_to_bool(optarg);
@@ -668,6 +679,8 @@ void global_print_help(void)
 	print("   -v, --versionurl=[URL]  RFC-3986 encoded url for version file downloads\n");
 	print("   -F, --format=[staging,1,2,etc.]  the format suffix for version file downloads\n");
 	print("   -S, --statedir=[PATH]   Specify alternate swupd state directory\n");
+	print("   -K, --cachedir=[PATH]   Specify alternate swupd cache directory\n");
+	print("   -Z, --datadir=[PATH]    Specify alternate swupd state directory\n");
 	print("   -C, --certpath=[PATH]   Specify alternate path to swupd certificates\n");
 	print("   -W, --max-parallel-downloads=[n] Set the maximum number of parallel downloads\n");
 	print("   -r, --max-retries=[n]   Maximum number of retries for download failures\n");
