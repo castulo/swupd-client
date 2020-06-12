@@ -20,6 +20,7 @@
 # KEEP_ENV
 # ENV_ONLY
 # SHOW_TARGET
+# NO_CLONE
 
 # Relevant paths
 # --------------
@@ -646,10 +647,36 @@ write_to_protected_file() { # swupd_function
 
 }
 
+set_env_variable() { # swupd_function
+
+	show_help "$(cat <<-EOM
+		Sets a custom environment variable that will be available to other tests
+		in the test file.
+
+		Usage:
+		    set_env_variable <var_name> <value>
+
+		Arguments:
+		    - var_name: the name of the environment variable
+		    - value: value of the variable
+	EOM
+	)" "$@"
+
+	local var_name=$1
+	local value=$2
+	validate_param "$var_name"
+	validate_param "$value"
+
+	export "$var_name"="$value"
+	echo "export $var_name=\"$value\"" >> "$ENVIRONMENT_FILE"
+	debug_msg "$var_name"="$value"
+
+}
+
 set_env_variables() { # swupd_function
 
 	show_help "$(cat <<-EOM
-		Exports the environment variables that are dependent on the test environment.
+		Sets the environment variables that are dependent on the test environment.
 
 		Usage:
 		    set_env_variables <env_name>
@@ -672,123 +699,50 @@ set_env_variables() { # swupd_function
 
 	# relevant relative paths
 	export WEB_DIR="$env_name"/web-dir
-	echo "export WEB_DIR=$WEB_DIR" >> "$ENVIRONMENT_FILE"
-	debug_msg "WEB_DIR: $WEB_DIR"
-
+	set_env_variable WEB_DIR "$env_name"/web-dir
 	export TARGET_DIR="$env_name"/testfs/target-dir
-	echo "export TARGET_DIR=$TARGET_DIR" >> "$ENVIRONMENT_FILE"
-	debug_msg "TARGET_DIR: $TARGET_DIR"
-
+	set_env_variable TARGET_DIR "$env_name"/testfs/target-dir
 	export STATE_DIR="$env_name"/testfs/state
-	echo "export STATE_DIR=$STATE_DIR" >> "$ENVIRONMENT_FILE"
-	debug_msg "STATE_DIR: $STATE_DIR"
-
-	export SWUPD_CONFIG_DIR="$env_name"/testconfig
-	echo "export SWUPD_CONFIG_DIR=$SWUPD_CONFIG_DIR" >> "$ENVIRONMENT_FILE"
-	debug_msg "SWUPD_CONFIG_DIR: $SWUPD_CONFIG_DIR"
-
-	export SWUPD_CONFIG_FILE="$SWUPD_CONFIG_DIR"/config
-	echo "export SWUPD_CONFIG_FILE=$SWUPD_CONFIG_FILE" >> "$ENVIRONMENT_FILE"
-	debug_msg "SWUPD_CONFIG_FILE: $SWUPD_CONFIG_FILE"
+	set_env_variable STATE_DIR "$env_name"/testfs/state
+	set_env_variable SWUPD_CONFIG_DIR "$env_name"/testconfig
+	set_env_variable SWUPD_CONFIG_FILE "$SWUPD_CONFIG_DIR"/config
 
 	# relevant absolute paths
-	export ABS_TEST_DIR="$ABS_TESTLIB_WD"/"$env_name"
-	echo "export ABS_TEST_DIR=$ABS_TEST_DIR" >> "$ENVIRONMENT_FILE"
-	debug_msg "ABS_TEST_DIR: $ABS_TEST_DIR"
-
-	export ABS_TARGET_DIR="$ABS_TEST_DIR"/testfs/target-dir
-	echo "export ABS_TARGET_DIR=$ABS_TARGET_DIR" >> "$ENVIRONMENT_FILE"
-	debug_msg "ABS_TARGET_DIR: $ABS_TARGET_DIR"
-
-	export ABS_STATE_DIR="$ABS_TEST_DIR"/testfs/state
-	echo "export ABS_STATE_DIR=$ABS_STATE_DIR" >> "$ENVIRONMENT_FILE"
-	debug_msg "ABS_STATE_DIR: $ABS_STATE_DIR"
-
-	export ABS_TRACKING_DIR="$ABS_STATE_DIR"/bundles
-	echo "export ABS_TRACKING_DIR=$ABS_TRACKING_DIR" >> "$ENVIRONMENT_FILE"
-	debug_msg "ABS_TRACKING_DIR: $ABS_TRACKING_DIR"
-
-	export ABS_CACHE_DIR="$ABS_STATE_DIR"/cache/"$converted_url"
-	echo "export ABS_CACHE_DIR=$ABS_CACHE_DIR" >> "$ENVIRONMENT_FILE"
-	debug_msg "ABS_CACHE_DIR: $ABS_CACHE_DIR"
-
-	export ABS_DELTA_DIR="$ABS_STATE_DIR"/cache/"$converted_url"/delta
-	echo "export ABS_DELTA_DIR=$ABS_DELTA_DIR" >> "$ENVIRONMENT_FILE"
-	debug_msg "ABS_DELTA_DIR: $ABS_DELTA_DIR"
-
-	export ABS_DOWNLOAD_DIR="$ABS_STATE_DIR"/cache/"$converted_url"/download
-	echo "export ABS_DOWNLOAD_DIR=$ABS_DOWNLOAD_DIR" >> "$ENVIRONMENT_FILE"
-	debug_msg "ABS_DOWNLOAD_DIR: $ABS_DOWNLOAD_DIR"
-
-	export ABS_MANIFEST_DIR="$ABS_STATE_DIR"/cache/"$converted_url"/manifest
-	echo "export ABS_MANIFEST_DIR=$ABS_MANIFEST_DIR" >> "$ENVIRONMENT_FILE"
-	debug_msg "ABS_MANIFEST_DIR: $ABS_MANIFEST_DIR"
-
-	export ABS_STAGED_DIR="$ABS_STATE_DIR"/cache/"$converted_url"/staged
-	echo "export ABS_STAGED_DIR=$ABS_STAGED_DIR" >> "$ENVIRONMENT_FILE"
-	debug_msg "ABS_STAGED_DIR: $ABS_STAGED_DIR"
-
-	export ABS_TEMP_DIR="$ABS_STATE_DIR"/cache/"$converted_url"/temp
-	echo "export ABS_TEMP_DIR=$ABS_TEMP_DIR" >> "$ENVIRONMENT_FILE"
-	debug_msg "ABS_TEMP_DIR: $ABS_TEMP_DIR"
-
-	export ABS_CLIENT_CERT_DIR="$testfs_path/target-dir/etc/swupd"
-	echo "export ABS_CLIENT_CERT_DIR=$ABS_CLIENT_CERT_DIR" >> "$ENVIRONMENT_FILE"
-	debug_msg "ABS_CLIENT_CERT_DIR: $ABS_CLIENT_CERT_DIR"
-
-	export ABS_MIRROR_DIR="$ABS_TESTLIB_WD"/"$env_name"/mirror/web-dir
-	echo "export ABS_MIRROR_DIR=$ABS_MIRROR_DIR" >> "$ENVIRONMENT_FILE"
-	debug_msg "ABS_MIRROR_DIR: $ABS_MIRROR_DIR"
-
+	set_env_variable ABS_TEST_DIR "$ABS_TESTLIB_WD"/"$env_name"
+	set_env_variable ABS_TARGET_DIR "$ABS_TEST_DIR"/testfs/target-dir
+	set_env_variable ABS_STATE_DIR "$ABS_TEST_DIR"/testfs/state
+	set_env_variable ABS_TRACKING_DIR "$ABS_STATE_DIR"/bundles
+	set_env_variable ABS_CACHE_DIR "$ABS_STATE_DIR"/cache/"$converted_url"
+	set_env_variable ABS_DELTA_DIR "$ABS_STATE_DIR"/cache/"$converted_url"/delta
+	set_env_variable ABS_DOWNLOAD_DIR "$ABS_STATE_DIR"/cache/"$converted_url"/download
+	set_env_variable ABS_MANIFEST_DIR "$ABS_STATE_DIR"/cache/"$converted_url"/manifest
+	set_env_variable ABS_STAGED_DIR "$ABS_STATE_DIR"/cache/"$converted_url"/staged
+	set_env_variable ABS_TEMP_DIR "$ABS_STATE_DIR"/cache/"$converted_url"/temp
+	set_env_variable ABS_CLIENT_CERT_DIR "$testfs_path/target-dir/etc/swupd"
+	set_env_variable ABS_MIRROR_DIR "$ABS_TESTLIB_WD"/"$env_name"/mirror/web-dir
 
 	# different options for swupd
-	export SWUPD_OPTS="-S $testfs_path/state -p $testfs_path/target-dir -F staging -C $ABS_TEST_DIR/Swupd_Root.pem -I --no-progress"
-	echo "export SWUPD_OPTS=\"$SWUPD_OPTS\"" >> "$ENVIRONMENT_FILE"
-
-	export SWUPD_OPTS_PROGRESS="-S $testfs_path/state -p $testfs_path/target-dir -F staging -C $ABS_TEST_DIR/Swupd_Root.pem -I"
-	echo "export SWUPD_OPTS_PROGRESS=\"$SWUPD_OPTS_PROGRESS\"" >> "$ENVIRONMENT_FILE"
-
-	export SWUPD_OPTS_KEEPCACHE="$SWUPD_OPTS --keepcache"
-	echo "export SWUPD_OPTS_KEEPCACHE=\"$SWUPD_OPTS_KEEPCACHE\"" >> "$ENVIRONMENT_FILE"
-
-	export SWUPD_OPTS_NO_CERT="-S $testfs_path/state -p $testfs_path/target-dir -F staging -I --no-progress"
-	echo "export SWUPD_OPTS_NO_CERT=\"$SWUPD_OPTS_NO_CERT\"" >> "$ENVIRONMENT_FILE"
-
-	export SWUPD_OPTS_NO_FMT="-S $testfs_path/state -p $testfs_path/target-dir -C $ABS_TEST_DIR/Swupd_Root.pem -I --no-progress"
-	echo "export SWUPD_OPTS_NO_FMT=\"$SWUPD_OPTS_NO_FMT\"" >> "$ENVIRONMENT_FILE"
-
-	export SWUPD_OPTS_NO_FMT_NO_CERT="-S $testfs_path/state -p $testfs_path/target-dir -I --no-progress"
-	echo "export SWUPD_OPTS_NO_FMT_NO_CERT=\"$SWUPD_OPTS_NO_FMT_NO_CERT\"" >> "$ENVIRONMENT_FILE"
-
-	export SWUPD_OPTS_NO_PATH="-S $testfs_path/state -F staging -C $ABS_TEST_DIR/Swupd_Root.pem -I --no-progress"
-	echo "export SWUPD_OPTS_NO_PATH=\"$SWUPD_OPTS_NO_PATH\"" >> "$ENVIRONMENT_FILE"
-
-	export SWUPD_OPTS_NO_STATE="-p $testfs_path/target-dir -F staging -C $ABS_TEST_DIR/Swupd_Root.pem -I --no-progress"
-	echo "export SWUPD_OPTS_NO_STATE=\"$SWUPD_OPTS_NO_STATE\"" >> "$ENVIRONMENT_FILE"
-
+	set_env_variable SWUPD_OPTS "-S $testfs_path/state -p $testfs_path/target-dir -F staging -C $ABS_TEST_DIR/Swupd_Root.pem -I --no-progress"
+	set_env_variable SWUPD_OPTS_PROGRESS "-S $testfs_path/state -p $testfs_path/target-dir -F staging -C $ABS_TEST_DIR/Swupd_Root.pem -I"
+	set_env_variable SWUPD_OPTS_KEEPCACHE "$SWUPD_OPTS --keepcache"
+	set_env_variable SWUPD_OPTS_NO_CERT "-S $testfs_path/state -p $testfs_path/target-dir -F staging -I --no-progress"
+	set_env_variable SWUPD_OPTS_NO_FMT "-S $testfs_path/state -p $testfs_path/target-dir -C $ABS_TEST_DIR/Swupd_Root.pem -I --no-progress"
+	set_env_variable SWUPD_OPTS_NO_FMT_NO_CERT "-S $testfs_path/state -p $testfs_path/target-dir -I --no-progress"
+	set_env_variable SWUPD_OPTS_NO_PATH "-S $testfs_path/state -F staging -C $ABS_TEST_DIR/Swupd_Root.pem -I --no-progress"
+	set_env_variable SWUPD_OPTS_NO_STATE "-p $testfs_path/target-dir -F staging -C $ABS_TEST_DIR/Swupd_Root.pem -I --no-progress"
 
 	# path to relevant files
-	export CLIENT_CERT_FILE="$ABS_CLIENT_CERT_DIR/client.pem"
-	echo "export CLIENT_CERT_FILE=$CLIENT_CERT_FILE" >> "$ENVIRONMENT_FILE"
-
-	export PORT_FILE="$ABS_TESTLIB_WD/$env_name/port_file.txt" # stores web server port
-	echo "export PORT_FILE=$PORT_FILE" >> "$ENVIRONMENT_FILE"
-
-	export SERVER_PID_FILE="$ABS_TESTLIB_WD/$env_name/pid_file.txt" # stores web server pid
-	echo "export SERVER_PID_FILE=$SERVER_PID_FILE" >> "$ENVIRONMENT_FILE"
-
+	set_env_variable CLIENT_CERT_FILE "$ABS_CLIENT_CERT_DIR/client.pem"
+	set_env_variable PORT_FILE "$ABS_TESTLIB_WD/$env_name/port_file.txt" # stores web server port
+	set_env_variable SERVER_PID_FILE "$ABS_TESTLIB_WD/$env_name/pid_file.txt" # stores web server pid
 
 	# Add environment variables for PORT and SERVER_PID when web server used
 	if [ -f "$PORT_FILE" ]; then
-		PORT=$(cat "$PORT_FILE")
-		export PORT
-		echo "export PORT=$PORT" >> "$ENVIRONMENT_FILE"
+		set_env_variable PORT "$(cat "$PORT_FILE")"
 	fi
 
 	if [ -f "$SERVER_PID_FILE" ]; then
-		SERVER_PID=$(cat "$SERVER_PID_FILE")
-		export SERVER_PID
-		echo "export SERVER_PID=$SERVER_PID" >> "$ENVIRONMENT_FILE"
+		set_env_variable SERVER_PID "$(cat "$SERVER_PID_FILE")"
 	fi
 
 }
@@ -820,54 +774,20 @@ set_env_variables_third_party() { # swupd_function
 	converted_url=file___"$(echo "$url" | tr / _)"
 
 	# relevant relative paths
-	export TP_STATE_DIR="$STATE_DIR"/3rd-party/"$repo_name"
-	echo "export TP_STATE_DIR=$TP_STATE_DIR" >> "$ENVIRONMENT_FILE"
-	debug_msg "TP_STATE_DIR: $TP_STATE_DIR"
-
-	export TP_WEB_DIR="$env_name"/3rd-party/"$repo_name"
-	echo "export TP_WEB_DIR=$TP_WEB_DIR" >> "$ENVIRONMENT_FILE"
-	debug_msg "TP_WEB_DIR: $TP_WEB_DIR"
-
-	export TP_TARGET_DIR="$env_name"/testfs/target-dir/"$TP_BUNDLES_DIR"/"$repo_name"
-	echo "export TP_TARGET_DIR=$TP_TARGET_DIR" >> "$ENVIRONMENT_FILE"
-	debug_msg "TP_TARGET_DIR: $TP_TARGET_DIR"
+	set_env_variable TP_STATE_DIR "$STATE_DIR"/3rd-party/"$repo_name"
+	set_env_variable TP_WEB_DIR "$env_name"/3rd-party/"$repo_name"
+	set_env_variable TP_TARGET_DIR "$env_name"/testfs/target-dir/"$TP_BUNDLES_DIR"/"$repo_name"
 
 	# relevant absolute paths
-	export ABS_TP_URL="$url"
-	echo "export ABS_TP_URL=$ABS_TP_URL" >> "$ENVIRONMENT_FILE"
-	debug_msg "ABS_TP_URL: $ABS_TP_URL"
-
-	export ABS_TP_STATE_DIR="$ABS_TESTLIB_WD"/"$TP_STATE_DIR"
-	echo "export ABS_TP_STATE_DIR=$ABS_TP_STATE_DIR" >> "$ENVIRONMENT_FILE"
-	debug_msg "ABS_TP_STATE_DIR: $ABS_TP_STATE_DIR"
-
-	export ABS_TP_TRACKING_DIR="$ABS_TP_STATE_DIR"/bundles
-	echo "export ABS_TP_TRACKING_DIR=$ABS_TP_TRACKING_DIR" >> "$ENVIRONMENT_FILE"
-	debug_msg "ABS_TP_TRACKING_DIR: $ABS_TP_TRACKING_DIR"
-
-	export ABS_TP_CACHE_DIR="$ABS_TP_STATE_DIR"/cache/"$converted_url"
-	echo "export ABS_TP_CACHE_DIR=$ABS_TP_CACHE_DIR" >> "$ENVIRONMENT_FILE"
-	debug_msg "ABS_TP_CACHE_DIR: $ABS_TP_CACHE_DIR"
-
-	export ABS_TP_DELTA_DIR="$ABS_TP_STATE_DIR"/cache/"$converted_url"/delta
-	echo "export ABS_TP_DELTA_DIR=$ABS_TP_DELTA_DIR" >> "$ENVIRONMENT_FILE"
-	debug_msg "ABS_TP_DELTA_DIR: $ABS_TP_DELTA_DIR"
-
-	export ABS_TP_DOWNLOAD_DIR="$ABS_TP_STATE_DIR"/cache/"$converted_url"/download
-	echo "export ABS_TP_DOWNLOAD_DIR=$ABS_TP_DOWNLOAD_DIR" >> "$ENVIRONMENT_FILE"
-	debug_msg "ABS_TP_DOWNLOAD_DIR: $ABS_TP_DOWNLOAD_DIR"
-
-	export ABS_TP_MANIFEST_DIR="$ABS_TP_STATE_DIR"/cache/"$converted_url"/manifest
-	echo "export ABS_TP_MANIFEST_DIR=$ABS_TP_MANIFEST_DIR" >> "$ENVIRONMENT_FILE"
-	debug_msg "ABS_TP_MANIFEST_DIR: $ABS_TP_MANIFEST_DIR"
-
-	export ABS_TP_STAGED_DIR="$ABS_TP_STATE_DIR"/cache/"$converted_url"/staged
-	echo "export ABS_TP_STAGED_DIR=$ABS_TP_STAGED_DIR" >> "$ENVIRONMENT_FILE"
-	debug_msg "ABS_TP_STAGED_DIR: $ABS_TP_STAGED_DIR"
-
-	export ABS_TP_TEMP_DIR="$ABS_TP_STATE_DIR"/cache/"$converted_url"/temp
-	echo "export ABS_TP_TEMP_DIR=$ABS_TP_TEMP_DIR" >> "$ENVIRONMENT_FILE"
-	debug_msg "ABS_TP_TEMP_DIR: $ABS_TP_TEMP_DIR"
+	set_env_variable ABS_TP_URL "$url"
+	set_env_variable ABS_TP_STATE_DIR "$ABS_TESTLIB_WD"/"$TP_STATE_DIR"
+	set_env_variable ABS_TP_TRACKING_DIR "$ABS_TP_STATE_DIR"/bundles
+	set_env_variable ABS_TP_CACHE_DIR "$ABS_TP_STATE_DIR"/cache/"$converted_url"
+	set_env_variable ABS_TP_DELTA_DIR "$ABS_TP_STATE_DIR"/cache/"$converted_url"/delta
+	set_env_variable ABS_TP_DOWNLOAD_DIR "$ABS_TP_STATE_DIR"/cache/"$converted_url"/download
+	set_env_variable ABS_TP_MANIFEST_DIR "$ABS_TP_STATE_DIR"/cache/"$converted_url"/manifest
+	set_env_variable ABS_TP_STAGED_DIR "$ABS_TP_STATE_DIR"/cache/"$converted_url"/staged
+	set_env_variable ABS_TP_TEMP_DIR "$ABS_TP_STATE_DIR"/cache/"$converted_url"/temp
 
 }
 
@@ -892,12 +812,10 @@ set_env_variables_content() { # swupd_function
 	local hashed_name
 
 	hashed_name=$(sudo "$SWUPD" hashdump --quiet "$content_dir"/"$version"/os-release)
-	export OS_RELEASE_FILE="$content_dir"/"$version"/files/"$hashed_name"
-	echo "export OS_RELEASE_FILE=$OS_RELEASE_FILE" >> "$ENVIRONMENT_FILE"
+	set_env_variable OS_RELEASE_FILE "$content_dir"/"$version"/files/"$hashed_name"
 
 	hashed_name=$(sudo "$SWUPD" hashdump --quiet "$content_dir"/"$version"/format)
-	export FORMAT_FILE="$content_dir"/"$version"/files/"$hashed_name"
-	echo "export FORMAT_FILE=$FORMAT_FILE" >> "$ENVIRONMENT_FILE"
+	set_env_variable FORMAT_FILE "$content_dir"/"$version"/files/"$hashed_name"
 
 }
 
@@ -4620,6 +4538,97 @@ is_global_environment() {
 	[ -d "$TEST_NAME_SHORT" ]
 }
 
+setup_init()
+{
+
+	# we just started runnig the test, if an old global environment is
+	# found, it is a leftover, we need to remove it
+	if is_global_environment; then
+		debug_msg "\\nAn old test environment was found for this test: $TEST_NAME_SHORT"
+		debug_msg "Deleting it..."
+		destroy_test_environment --force "$TEST_NAME_SHORT"
+	fi
+
+	debug_msg "\\nRunning global setup..."
+	global_setup
+	debug_msg "Global setup finished\\n"
+
+	# determine if a test environment was created during global_setup
+	if is_global_environment; then
+		print "Global test environment created: $TEST_NAME_SHORT"
+		# we are done with the init
+		return
+	fi
+
+	if [ "$NO_CLONE" = true ]; then
+		return
+	fi
+
+	# no test environment was crated with the global setup,
+	# now let's try with the local setup, we need to set the relevant
+	# en variables for a local setup
+	set_env_variables_setup
+
+	# we just started runnig the test, if a local environment is found,
+	# it is a leftover, we need to remove it
+	if [ -d "$TEST_NAME" ]; then
+		debug_msg "\\nAn old test environment was found for this test: $TEST_NAME"
+		debug_msg "Deleting it..."
+		destroy_test_environment --force "$TEST_NAME"
+	fi
+
+	debug_msg "\\nRunning test_setup..."
+	test_setup
+	debug_msg "Finished running test_setup\\n"
+
+	# determine if a test environment was created during test_setup
+	if [ -d "$TEST_NAME" ]; then
+		# a local environment was created, let's replicate it once per
+		# test in the test file
+		print "Local test environment created: $TEST_NAME"
+
+		local env
+		local env_name
+		local dirs_to_rename
+		for env in "${BATS_TEST_NAMES[@]}"; do
+			# skip the current one, it has been already created
+			if [ "$env" != "$BATS_TEST_NAME" ]; then
+
+				env_name="${env#test}"
+				env_name="${env_name%-3a*}"
+				env_name="$TEST_NAME_SHORT$env_name"
+
+				# if the directory exists, it is a leftover, we need to
+				# remove it
+				if [ -d "$env_name" ]; then
+					debug_msg "\\nAn old test environment was found for this test: $env_name"
+					debug_msg "Deleting it..."
+					destroy_test_environment --force "$env_name"
+				fi
+
+				# copy all the content from the first test
+				mkdir "$env_name"
+				sudo cp --recursive --preserve "$TEST_NAME"/. "$env_name"
+
+				# update those files that should be unique per test environment
+				# update the .env file with the correct TEST_NAME
+				sudo grep -rl "$TEST_NAME" "$env_name"/ | xargs sudo sed -i "s/$TEST_NAME/$env_name/g"
+
+				# rename directories to match their environment
+				mapfile -t dirs_to_rename < <(sudo find "$env_name" -name "*$TEST_NAME*" -type d)
+				for d in "${dirs_to_rename[@]}"; do
+					sudo mv "$d" "${d/$TEST_NAME/$env_name}"
+					# sudo rename "$TEST_NAME" "$env_name" "$d"
+				done
+
+				print "Local test environment created: $env_name"
+
+			fi
+		done
+	fi
+
+}
+
 setup() {
 
 	print "\\n\\n\\n$sep"
@@ -4627,6 +4636,7 @@ setup() {
 	print "$sep\\n"
 
 	debug_msg "TEST_FILE_NAME: $TEST_FILE_NAME"
+	debug_msg "Tests in the test file: ${#BATS_TEST_NAMES[@]}"
 	debug_msg "BATS_TEST_NUMBER: $BATS_TEST_NUMBER"
 
 	# this block will run only once regardless of how many tests are in the test file,
@@ -4634,20 +4644,7 @@ setup() {
 	# only once before all tests
 	if [ "$BATS_TEST_NAME" = "${BATS_TEST_NAMES[0]}" ]; then
 
-		# if an old global environment is found, we need to remove it
-		if is_global_environment; then
-			debug_msg "\\nAn old test environment was found for this test: $TEST_NAME_SHORT"
-			debug_msg "Deleting it..."
-			destroy_test_environment --force "$TEST_NAME_SHORT"
-		fi
-
-		debug_msg "\\nRunning global setup..."
-		global_setup
-		debug_msg "Global setup finished\\n"
-
-		if is_global_environment; then
-			print "Global test environment created: $TEST_NAME_SHORT"
-		fi
+		setup_init
 
 	fi
 
@@ -4658,39 +4655,26 @@ setup() {
 	#   test environment then TEST_NAME = $TEST_NAME_SHORT + _ + <test_id>
 	set_env_variables_setup
 
-	# if a local environment exists at this point it is a leftover from a previous
-	# execution that used test_setup to create the environment.
-	# if that is the case, we need to remove it
-	if ! is_global_environment && [ -d "$TEST_NAME" ]; then
-		debug_msg "\\nAn old test environment was found for this test: $TEST_NAME"
-		debug_msg "Deleting it..."
-		destroy_test_environment --force "$TEST_NAME"
-	fi
-
-	# we need to export the env variables before running the test_setup and after
-	# since the user could have used a global_setup() and a test_setup() together
-	# in a test, in that case we need to have the env loaded before running the
-	# test_setup()
-	#
 	# ShellCheck won't be able to include sourced files from paths that are determined
 	# at runtime, this is not a problem in this case, the file has only env variables
 	# shellcheck source=/dev/null
 	if [ -f "$ENVIRONMENT_FILE" ]; then
-		debug_msg "\\nSetting environment variables pre-setup for the current test..."
+		debug_msg "\\nSetting environment variables for the current test..."
 		source "$ENVIRONMENT_FILE"
 		debug_msg "Env variables exported"
+	else
+		debug_msg "No env file found, variables not exported!"
 	fi
 
-	debug_msg "\\nRunning test_setup..."
-	test_setup
-	debug_msg "Finished running test_setup\\n"
-
-	# export the environment variables post-setup
-	# shellcheck source=/dev/null
-	if [ -f "$ENVIRONMENT_FILE" ]; then
-		debug_msg "\\nSetting environment variables post-setup for the current test..."
-		source "$ENVIRONMENT_FILE"
-		debug_msg "Env variables exported"
+	# if we are using a global environment, we still need to run the test_setup
+	# on every test, if we are running a local environment we don't need to since
+	# all local environments should have been already created during setup_init
+	# unless the NO_CLONE was used, in which case we should run setup normally at
+	# the begining of each test
+	if is_global_environment || [ "$NO_CLONE" = true ]; then
+		debug_msg "\\nRunning test_setup..."
+		test_setup
+		debug_msg "Finished running test_setup\\n"
 	fi
 
 	if [ "$DEBUG_TEST" = true ] || [ "$SHOW_TARGET" = true ]; then
@@ -5296,7 +5280,16 @@ testlib() {
 		echo "            Example: ENV_ONLY=true bats my_test.bats"
 		echo "SHOW_TARGET: If set to 'true', the tree view of the filesystem in the target system before"
 		echo "            and after the test will be printed. Note that the -t flag is needed as well."
-		echo "            Example: SHOW_TARGET=tru bats my_test.bats"
+		echo "            Example: SHOW_TARGET=true bats my_test.bats"
+		echo "NO_CLONE:   Test files that includes many tests and use test_setup() to create their test"
+		echo "            environment create only one environment then they clone it as many times as"
+		echo "            necessary so each test has its own environment. If the NO_CLONE variable is set,"
+		echo "            instead of cloning the environments, all environments are created from scratch,"
+		echo "            this is important for some tests with special conditions. For most cases, it is"
+		echo "            better to clone the environments since it is much faster."
+		echo "            Example: NO_CLONE=true bats my_test.bats  # runs this test without cloning once"
+		echo "            If you want to permanently run a test without cloning environments, this variable"
+		echo "            needs to be set at the top of the test file, right after loading the testlib."
 	fi
 
 }

@@ -64,19 +64,20 @@ test_setup() {
 
 	sudo mkdir -p "$ABS_TP_MANIFEST_DIR"/{10,20}
 	MOM=$(create_manifest "$ABS_TP_MANIFEST_DIR"/20 MoM 1 10)
+	set_env_variable MOM "$MOM"
 	write_to_protected_file -a "$MOM" "M...	dfd541b1ac9256982044848f2128f51e23ddbb72f68e9de43adaf8f7ead93657	10	p11-kit\n"
 	write_to_protected_file -a "$MOM" "M...	7414710480607fa89c307ad11d145d8bb0cbdbdf3c0692f940d906b670f6fd5d	20	emacs\n"
-	MOM_SIG="$MOM".sig ; sudo touch "$MOM_SIG"
-	FILE1="$ABS_TP_MANIFEST_DIR"/10/Manifest.p11-kit ; sudo touch "$FILE1"
-	FILE2="$ABS_TP_MANIFEST_DIR"/10/Manifest.p11-kit.dfd541b1ac9256982044848f2128f51e23ddbb72f68e9de43adaf8f7ead93657 ; sudo touch "$FILE2"
-	FILE3="$ABS_TP_MANIFEST_DIR"/20/Manifest.emacs ; sudo touch "$FILE3"
-	FILE4="$ABS_TP_MANIFEST_DIR"/20/Manifest.emacs.7414710480607fa89c307ad11d145d8bb0cbdbdf3c0692f940d906b670f6fd5d ; sudo touch "$FILE4"
-	FILE5="$ABS_TP_MANIFEST_DIR"/Manifest-emacs-delta-from-10-to-20 ; sudo touch "$FILE5"
-	FILE6="$ABS_TP_MANIFEST_DIR"/Manifest-vim-delta-from-10-to-20 ; sudo touch "$FILE6"
-	FILE7="$ABS_TP_CACHE_DIR"/pack-blender-from-0-to-20.tar ; sudo touch "$FILE7"
-	FILE8="$ABS_TP_CACHE_DIR"/pack-vim-from-10-to-20.tar ; sudo touch "$FILE8"
-	FILE9="$ABS_TP_STAGED_DIR"/00004ead4b4eb1cef1ebbe13849f6c47c21d325182f98cf8f5333e9a76d2e2df ; sudo touch "$FILE9"
-	FILE10="$ABS_TP_STAGED_DIR"/fffe891980af628e498b16a364b5b4d00377485370ccc4d09ac0fc072e85b31d ; sudo touch "$FILE10"
+	set_env_variable MOM_SIG "$MOM".sig ; sudo touch "$MOM_SIG"
+	set_env_variable FILE1 "$ABS_TP_MANIFEST_DIR"/10/Manifest.p11-kit ; sudo touch "$FILE1"
+	set_env_variable FILE2 "$ABS_TP_MANIFEST_DIR"/10/Manifest.p11-kit.dfd541b1ac9256982044848f2128f51e23ddbb72f68e9de43adaf8f7ead93657 ; sudo touch "$FILE2"
+	set_env_variable FILE3 "$ABS_TP_MANIFEST_DIR"/20/Manifest.emacs ; sudo touch "$FILE3"
+	set_env_variable FILE4 "$ABS_TP_MANIFEST_DIR"/20/Manifest.emacs.7414710480607fa89c307ad11d145d8bb0cbdbdf3c0692f940d906b670f6fd5d ; sudo touch "$FILE4"
+	set_env_variable FILE5 "$ABS_TP_MANIFEST_DIR"/Manifest-emacs-delta-from-10-to-20 ; sudo touch "$FILE5"
+	set_env_variable FILE6 "$ABS_TP_MANIFEST_DIR"/Manifest-vim-delta-from-10-to-20 ; sudo touch "$FILE6"
+	set_env_variable FILE7 "$ABS_TP_CACHE_DIR"/pack-blender-from-0-to-20.tar ; sudo touch "$FILE7"
+	set_env_variable FILE8 "$ABS_TP_CACHE_DIR"/pack-vim-from-10-to-20.tar ; sudo touch "$FILE8"
+	set_env_variable FILE9 "$ABS_TP_STAGED_DIR"/00004ead4b4eb1cef1ebbe13849f6c47c21d325182f98cf8f5333e9a76d2e2df ; sudo touch "$FILE9"
+	set_env_variable FILE10 "$ABS_TP_STAGED_DIR"/fffe891980af628e498b16a364b5b4d00377485370ccc4d09ac0fc072e85b31d ; sudo touch "$FILE10"
 
 	# create the cache from "repo2"
 	create_third_party_repo -a "$TEST_NAME" 10 staging repo2
@@ -84,12 +85,13 @@ test_setup() {
 
 	sudo mkdir -p "$ABS_TP_MANIFEST_DIR"/50
 	MOM2=$(create_manifest "$ABS_TP_MANIFEST_DIR"/50 MoM 1 40)
+	set_env_variable MOM2 "$MOM2"
 	write_to_protected_file -a "$MOM2" "M...	dfd541b1ac9256982044848f2128f51e23ddbb72f68e9de43adaf8f7ead12345	10	blender\n"
 	write_to_protected_file -a "$MOM2" "M...	1234510480607fa89c307ad11d145d8bb0cbdbdf3c0692f940d906b670f6fd5d	20	ansible\n"
-	MOM2_SIG="$MOM2".sig ; sudo touch "$MOM2_SIG"
-	FILE11="$ABS_TP_MANIFEST_DIR"/Manifest-qt-basic-delta-from-40-to-50 ; sudo touch "$FILE11"
-	FILE12="$ABS_TP_CACHE_DIR"/pack-lib-imageformat-from-30-to-50.tar ; sudo touch "$FILE12"
-	FILE13="$ABS_TP_STAGED_DIR"/ffaf66dab58a2074e5fe9dc6ab7bf8773c069817dcccf631148b6afc87166b4b ; sudo touch "$FILE13"
+	set_env_variable MOM2_SIG "$MOM2".sig ; sudo touch "$MOM2_SIG"
+	set_env_variable FILE11 "$ABS_TP_MANIFEST_DIR"/Manifest-qt-basic-delta-from-40-to-50 ; sudo touch "$FILE11"
+	set_env_variable FILE12 "$ABS_TP_CACHE_DIR"/pack-lib-imageformat-from-30-to-50.tar ; sudo touch "$FILE12"
+	set_env_variable FILE13 "$ABS_TP_STAGED_DIR"/ffaf66dab58a2074e5fe9dc6ab7bf8773c069817dcccf631148b6afc87166b4b ; sudo touch "$FILE13"
 
 }
 

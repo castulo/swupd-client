@@ -2,8 +2,6 @@
 
 load "../testlib"
 
-export file_path
-
 test_setup() {
 
 	create_test_environment "$TEST_NAME"
@@ -15,7 +13,7 @@ test_setup() {
 	add_dependency_to_manifest "$WEB_DIR"/10/Manifest.test-bundle3 test-bundle2
 	# collect info from the common file
 	file_hash=$(get_hash_from_manifest "$WEB_DIR"/10/Manifest.test-bundle1 /common)
-	file_path="$WEB_DIR"/10/files/"$file_hash"
+	set_env_variable file_path "$WEB_DIR"/10/files/"$file_hash"
 
 }
 

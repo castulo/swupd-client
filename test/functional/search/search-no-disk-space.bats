@@ -5,6 +5,9 @@
 
 load "../testlib"
 
+# these tests should not clone test environments
+NO_CLONE=true
+
 test_setup() {
 
 	# create a test environment with 10 MB of space

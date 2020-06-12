@@ -7,6 +7,7 @@ set -e
 ./scripts/github_actions/build_ci.bash
 
 # Install dependencies from ubuntu
+sudo apt-get install -y rename
 sudo apt-get install shellcheck
 sudo apt-get install doxygen
 sudo pip install coverxygen

@@ -5,16 +5,13 @@
 
 load "../testlib"
 
-export repo1
-export repo2
-
 test_setup() {
 
 	create_test_environment "$TEST_NAME"
 	create_third_party_repo "$TEST_NAME" 10 staging test-repo1
-	repo1="$ABS_TP_URL"
+	set_env_variable repo1 "$ABS_TP_URL"
 	create_third_party_repo "$TEST_NAME" 10 staging test-repo2
-	repo2="$ABS_TP_URL"
+	set_env_variable repo2 "$ABS_TP_URL"
 
 }
 

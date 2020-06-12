@@ -11,9 +11,9 @@ test_setup() {
 	create_bundle -n os-core -f /core "$TEST_NAME"
 
 	# Populate statedir-cache
-	statedir_cache_path="$ABS_TEST_DIR"/testfs/statedir-cache
+	set_env_variable statedir_cache_path "$ABS_TEST_DIR"/testfs/statedir-cache
 	sudo cp -r "$ABS_STATE_DIR" "$statedir_cache_path"
-	cache_url=$(basename "$ABS_CACHE_DIR")
+	set_env_variable cache_url $(basename "$ABS_CACHE_DIR")
 	sudo mkdir -m 755 -p "$statedir_cache_path"/cache/"$cache_url"/manifest/10
 	sudo cp "$WEB_DIR"/10/Manifest.MoM "$statedir_cache_path"/cache/"$cache_url"/manifest/10
 	sudo cp "$WEB_DIR"/10/Manifest.MoM.sig "$statedir_cache_path"/cache/"$cache_url"/manifest/10

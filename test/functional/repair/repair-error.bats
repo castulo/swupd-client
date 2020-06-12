@@ -5,6 +5,9 @@
 
 load "../testlib"
 
+# these tests should not clone test environments
+NO_CLONE=true
+
 test_setup() {
 
 	create_test_environment -r "$TEST_NAME" 10 1
